@@ -48,6 +48,7 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
   val inMemoryReconciledSpaceSchemas = new InMemoryKnowledge(reconciledSpace)
 
   val logger = Logger(this.getClass)
+
   // TODO Check for authentication and groups as for now everybody could see the whole graph
   def list(datatype: String): Action[AnyContent] = Action.async { implicit request =>
     val nexusPath: NexusPath = NexusPath(datatype.split("/").toList)
@@ -84,7 +85,7 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
             val duration = System.currentTimeMillis() - start
             println(s"sparql query: \n$sparqlPayload\n\nduration: ${duration}ms")
             val nexusPath = NexusPath(datatype)
-            Ok( Json.obj(
+            Ok(Json.obj(
               "data" -> InstanceController.formatInstanceList(arr),
               "label" -> JsString((FormHelper.formRegistry \ nexusPath.org \ nexusPath.domain \ nexusPath.schema \ nexusPath.version \ "label").asOpt[String].getOrElse(datatype)))
             )
@@ -103,7 +104,7 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
   }
 
   def get(id: String): Action[AnyContent] = Action.async { implicit request =>
-    val token =  request.headers.get("Authorization").getOrElse("")
+    val token = request.headers.get("Authorization").getOrElse("")
     val nexusPath = NexusPath(id.split("/").toList)
     retrieveOriginalInstance(id, token).flatMap[Result] {
       case Left(res) => Future.successful(Result(ResponseHeader(res.status, flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](res.headers))),
@@ -112,13 +113,13 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
         retrieveIncomingLinks(originalInstance, token).map {
           instances =>
             val reconcileInstances = instances.filter(instance => instance.nexusPath.toString() contains s"$reconciledSpace/${nexusPath.schema}/${nexusPath.version}")
-            if(reconcileInstances.nonEmpty){
+            if (reconcileInstances.nonEmpty) {
               val reconcileInstance = reconcileInstances.head
               FormHelper.getFormStructure(originalInstance.nexusPath, reconcileInstance.content) match {
                 case JsNull => NotImplemented("Form template is not yet implemented")
                 case json => Ok(json)
               }
-            }else{
+            } else {
               logger.debug("Nothing found in the consolidated space")
               FormHelper.getFormStructure(originalInstance.nexusPath, originalInstance.content) match {
                 case JsNull => NotImplemented("Form template is not yet implemented")
@@ -133,30 +134,31 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
 
   def retrieveIncomingLinks(originalInstance: Instance,
                             token: String): Future[IndexedSeq[Instance]] = {
-    val filter ="""
-                  |{"op":"or","value": [{
-                  |   "op":"eq",
-                  |   "path":"https://nexus-dev.humanbrainproject.org/vocabs/nexus/core/terms/v0.1.0/organization",
-                  |   "value": "https://nexus-dev.humanbrainproject.org/v0/organizations/reconciled"
-                  | }, {
-                  |   "op":"eq",
-                  |   "path":"https://nexus-dev.humanbrainproject.org/vocabs/nexus/core/terms/v0.1.0/organization",
-                  |   "value": "https://nexus-dev.humanbrainproject.org/v0/organizations/manual"
-                  | }
-                  | ]
-                  |}
-                """.stripMargin.stripLineEnd.replaceAll("\r\n", "")
+    val filter =
+      """
+        |{"op":"or","value": [{
+        |   "op":"eq",
+        |   "path":"https://nexus-dev.humanbrainproject.org/vocabs/nexus/core/terms/v0.1.0/organization",
+        |   "value": "https://nexus-dev.humanbrainproject.org/v0/organizations/reconciled"
+        | }, {
+        |   "op":"eq",
+        |   "path":"https://nexus-dev.humanbrainproject.org/vocabs/nexus/core/terms/v0.1.0/organization",
+        |   "value": "https://nexus-dev.humanbrainproject.org/v0/organizations/manual"
+        | }
+        | ]
+        |}
+      """.stripMargin.stripLineEnd.replaceAll("\r\n", "")
     NexusHelper.listAllNexusResult(s"$nexusEndpoint/v0/data/${originalInstance.id()}/incoming?deprecated=false&fields=all&size=50&filter=$filter", token).map {
       incomingLinks =>
-        incomingLinks.map( el => Instance((el \ "source").as[JsValue])).toIndexedSeq
+        incomingLinks.map(el => Instance((el \ "source").as[JsValue])).toIndexedSeq
     }
   }
 
 
-  def generateReconciledInstance(reconciledInstance:Instance, manualUpdates:IndexedSeq[Instance], userInfo: UserInfo, parentRevision: Int, parentId:String, token: String):JsObject = {
+  def generateReconciledInstance(reconciledInstance: Instance, manualUpdates: IndexedSeq[Instance], userInfo: UserInfo, parentRevision: Int, parentId: String, token: String): JsObject = {
 
     val recInstanceWithParents = addManualUpdateLinksToReconcileInstance(reconciledInstance, manualUpdates)
-    val cleanUpObject  = cleanUpInstanceForSave(recInstanceWithParents).+("@type" -> JsString(s"http://hbp.eu/reconciled#${reconciledInstance.nexusPath.schema.capitalize}"))
+    val cleanUpObject = InstanceController.cleanUpInstanceForSave(recInstanceWithParents).+("@type" -> JsString(s"http://hbp.eu/reconciled#${reconciledInstance.nexusPath.schema.capitalize}"))
     cleanUpObject +
       ("http://hbp.eu/reconciled#updater_id", JsString(userInfo.id)) +
       ("http://hbp.eu/reconciled#original_rev", JsNumber(parentRevision)) +
@@ -165,46 +167,32 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
       ("http://hbp.eu/reconciled#update_timestamp", JsNumber(new DateTime().getMillis))
   }
 
-  def createReconcileInstance(instance: JsObject,schema: String, version: String, token: String): Future[WSResponse] = {
+  def createReconcileInstance(instance: JsObject, schema: String, version: String, token: String): Future[WSResponse] = {
     ws.url(s"$nexusEndpoint/v0/data/$reconciledSpace/${schema}/${version}").withHttpHeaders("Authorization" -> token).post(instance)
   }
 
-  def updateReconcileInstance(instance: JsObject, nexusPath: NexusPath, id: String, revision: Int, token: String):  Future[WSResponse]  ={
+  def updateReconcileInstance(instance: JsObject, nexusPath: NexusPath, id: String, revision: Int, token: String): Future[WSResponse] = {
     ws.url(s"$nexusEndpoint/v0/data/$reconciledSpace/${nexusPath.schema}/${nexusPath.version}/$id?rev=${revision}").withHttpHeaders("Authorization" -> token).put(instance)
   }
 
-  def addManualUpdateLinksToReconcileInstance(reconciledInstance:Instance, incomingLinks: IndexedSeq[Instance]): Instance = {
-    val manualUpdates = incomingLinks.filter(instance => instance.nexusPath.toString() contains manualSpace)
-    val currentParent = (reconciledInstance.content \ "http://hbp.eu/reconciled#parents").asOpt[List[JsValue]].getOrElse( List[JsValue]())
-    val updatedParents: List[JsValue] = manualUpdates.foldLeft(currentParent){ (acc, manual) =>
-      val manualId = Json.obj( "@id" -> (manual.content \ "@id").as[String])
+  def addManualUpdateLinksToReconcileInstance(reconciledInstance: Instance, incomingLinks: IndexedSeq[Instance]): Instance = {
+    val manualUpdates: IndexedSeq[Instance] = incomingLinks.filter(instance => instance.nexusPath.toString() contains manualSpace)
+    val currentParent = (reconciledInstance.content \ "http://hbp.eu/reconciled#parents").asOpt[List[JsValue]].getOrElse(List[JsValue]())
+    val updatedParents: List[JsValue] = manualUpdates.foldLeft(currentParent) { (acc, manual) =>
+      val manualId = Json.obj("@id" -> (manual.content \ "@id").as[String])
       manualId :: acc
     }
-
     val jsArray = Json.toJson(updatedParents)
-    // Alternatives are added per per user
-    // So for each key we have a list of object containing the user id and the value
-    val alternatives = manualUpdates
-      .map{ instance =>
-        val dataMap = cleanUpInstanceForSave(instance).-("http://hbp.eu/manual#parent")
-          .-("http://hbp.eu/manual#origin").as[Map[String, JsValue]]
-        val userId = dataMap("http://hbp.eu/manual#updater_id")
-        dataMap.map{case (k ,v) =>  k -> Json.obj("updater_id" -> userId, "value" -> v)}
-      }.foldLeft(Map.empty[String, Seq[JsValue]]) { case (map, instance) =>
-      val tmp: List[(String, Seq[JsValue])] = instance.map { case (k, v) => (k, Seq(v)) }.toList ++ map.toList
-      tmp.groupBy(_._1).map { case (k, v) => k -> v.flatMap(_._2) }
-    }
-    val altJson = Json.toJson(alternatives)
-    val res = reconciledInstance.content.+( "http://hbp.eu/reconciled#parents" -> jsArray).+("http://hbp.eu/reconciled#alternatives", altJson)
+    val altJson = InstanceController.generateAlternatives(manualUpdates)
+    val res = reconciledInstance.content.+("http://hbp.eu/reconciled#parents" -> jsArray).+("http://hbp.eu/reconciled#alternatives", altJson)
     Instance(reconciledInstance.nexusUUID, reconciledInstance.nexusPath, res)
   }
 
-  def cleanUpInstanceForSave(instance: Instance):JsObject = {
-    val jsonObj = instance.content
-    jsonObj - ("@context") -("@type") - ("@id") - ("nxv:rev") - ("nxv:deprecated") - ("links")
-  }
+
+
 
   type UpdateInfo = (String, Int, String)
+
   def consolidateFromManualSpace(
                                   originalInstance: Instance,
                                   incomingLinks: IndexedSeq[Instance],
@@ -302,15 +290,15 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
               case (consolidatedInstance, manualEntitiesDetailsOpt) =>
                 logger.debug(s"Consolidated instance $updatedInstance")
                 val re: Future[Result] = for {
-                  createdSchemas <- createManualSchemaIfNeeded(updateToBeStoredInManual, originalInstance,token, inMemoryManualSpaceSchemas, manualSpace, "manual")
+                  createdSchemas <- createManualSchemaIfNeeded(updateToBeStoredInManual, originalInstance, token, inMemoryManualSpaceSchemas, manualSpace, "manual")
                   userInfo <- userInfoFuture
                   createdInManualSpace <- upsertUpdateInManualSpace(manualEntitiesDetailsOpt, userInfo, originalInstance.nexusPath.schema, updateToBeStoredInManual, token)
-                  createReconciledInstance <- upsertReconciledInstance(incomingLinks, originalInstance,updateToBeStoredInManual, updatedInstance, consolidatedInstance, token, userInfo)
+                  createReconciledInstance <- upsertReconciledInstance(incomingLinks, originalInstance, updateToBeStoredInManual, updatedInstance, consolidatedInstance, token, userInfo)
                 } yield {
                   logger.debug(s"Result from reconciled upsert: ${createReconciledInstance.status}")
-                  logger.debug( createReconciledInstance.body)
-                  (createReconciledInstance.status , createdInManualSpace.status) match {
-                    case (200, 200) =>  Ok(InstanceController.formatFromNexusToOption(updatedInstance))
+                  logger.debug(createReconciledInstance.body)
+                  (createReconciledInstance.status, createdInManualSpace.status) match {
+                    case (200, 200) => Ok(InstanceController.formatFromNexusToOption(updatedInstance))
                     case (200, _) => Result(
                       ResponseHeader(
                         createdInManualSpace.status,
@@ -318,7 +306,7 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
                       ),
                       HttpEntity.Strict(createdInManualSpace.bodyAsBytes, getContentType(createdInManualSpace.headers))
                     )
-                    case (_ , _) =>
+                    case (_, _) =>
                       Result(
                         ResponseHeader(
                           createReconciledInstance.status,
@@ -335,52 +323,54 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
     }
   }
 
-  def upsertReconciledInstance(instances: IndexedSeq[Instance], originalInstance: Instance, manualEntity: JsObject, updatedValue: JsObject, consolidatedInstance: Instance, token: String, userInfo: UserInfo ): Future[WSResponse] = {
+  def upsertReconciledInstance(instances: IndexedSeq[Instance], originalInstance: Instance, manualEntity: JsObject, updatedValue: JsObject, consolidatedInstance: Instance, token: String, userInfo: UserInfo): Future[WSResponse] = {
 
     val reconcileInstances = instances.filter(instance => instance.nexusPath.toString() contains reconciledSpace)
     val parentId = (originalInstance.content \ "@id").as[String]
-    if(reconcileInstances.nonEmpty){
+    if (reconcileInstances.nonEmpty) {
       val reconcileInstance = reconcileInstances.head
       val parentRevision = (reconcileInstance.content \ "nxv:rev").as[Int]
-      val payload = generateReconciledInstance(Instance(updatedValue), instances,userInfo, parentRevision, parentId, token)
+      val payload = generateReconciledInstance(Instance(updatedValue), instances, userInfo, parentRevision, parentId, token)
       updateReconcileInstance(payload, reconcileInstance.nexusPath, reconcileInstance.nexusUUID, parentRevision, token)
-    }else {
+    } else {
       val parentRevision = (originalInstance.content \ "nxv:rev").as[Int]
-      val payload = generateReconciledInstance(consolidatedInstance, instances,userInfo, parentRevision, parentId , token)
-      createManualSchemaIfNeeded(updatedValue, originalInstance, token, inMemoryReconciledSpaceSchemas, reconciledSpace, "reconciled" ).flatMap{
+      val payload = generateReconciledInstance(consolidatedInstance, instances, userInfo, parentRevision, parentId, token)
+      createManualSchemaIfNeeded(updatedValue, originalInstance, token, inMemoryReconciledSpaceSchemas, reconciledSpace, "reconciled").flatMap {
         res =>
           createReconcileInstance(payload, consolidatedInstance.nexusPath.schema, consolidatedInstance.nexusPath.version, token)
       }
     }
   }
 
-  def createManualSchemaIfNeeded(manualEntity: JsObject, originalInstance:Instance, token: String,schemasHashMap: InMemoryKnowledge,  space: String, destinationOrg: String):Future[Boolean]  = {
+  def createManualSchemaIfNeeded(manualEntity: JsObject, originalInstance: Instance, token: String, schemasHashMap: InMemoryKnowledge, space: String, destinationOrg: String): Future[Boolean] = {
     // ensure schema related to manual update exists or create it
-    if (manualEntity != JsNull){
+    if (manualEntity != JsNull) {
       if (schemasHashMap.manualSchema.isEmpty) { // initial load
         schemasHashMap.loadManualSchemaList(token)
       }
-      if (! schemasHashMap.manualSchema.contains(s"$nexusEndpoint/v0/schemas/$space/${originalInstance.nexusPath.schema}/${originalInstance.nexusPath.version}")){
-        NexusHelper.createSchema(destinationOrg, originalInstance.nexusPath.schema.capitalize, space, originalInstance.nexusPath.version, token).map{
-          response => response.status match {
-            case 200 => schemasHashMap.loadManualSchemaList(token)
-              logger.info(s"Schema created properly for : $space/${originalInstance.nexusPath.schema}/${originalInstance.nexusPath.version}")
-              Future.successful(true)
-            case _ => logger.error(s"ERROR - schema does not exist and automatic creation failed - ${response.body}")
-              Future.successful(false)
-          }
+      if (!schemasHashMap.manualSchema.contains(s"$nexusEndpoint/v0/schemas/$space/${originalInstance.nexusPath.schema}/${originalInstance.nexusPath.version}")) {
+        NexusHelper.createSchema(destinationOrg, originalInstance.nexusPath.schema.capitalize, space, originalInstance.nexusPath.version, token).map {
+          response =>
+            response.status match {
+              case 200 => schemasHashMap.loadManualSchemaList(token)
+                logger.info(s"Schema created properly for : $space/${originalInstance.nexusPath.schema}/${originalInstance.nexusPath.version}")
+                Future.successful(true)
+              case _ => logger.error(s"ERROR - schema does not exist and automatic creation failed - ${response.body}")
+                Future.successful(false)
+            }
         }
 
       }
     }
     Future.successful(true)
   }
-  def upsertUpdateInManualSpace(manualEntitiesDetailsOpt:Option[IndexedSeq[UpdateInfo]] , userInfo: UserInfo, schema:String, manualEntity:JsObject, token: String ): Future[WSResponse] = {
+
+  def upsertUpdateInManualSpace(manualEntitiesDetailsOpt: Option[IndexedSeq[UpdateInfo]], userInfo: UserInfo, schema: String, manualEntity: JsObject, token: String): Future[WSResponse] = {
     manualEntitiesDetailsOpt.flatMap { manualEntitiesDetails =>
       // find manual entry corresponding to the user
       manualEntitiesDetails.filter(_._3 == userInfo.id).headOption.map {
         case (manualEntityId, manualEntityRevision, _) =>
-          val cleanUpInstance =manualEntity.+("http://hbp.eu/manual#updater_id", JsString(userInfo.id)).+("http://hbp.eu/manual#update_timestamp", JsNumber(new DateTime().getMillis)).-("@context").-("@id").-("links").-("nxv:rev").-("nxv:deprecated")
+          val cleanUpInstance = manualEntity.+("http://hbp.eu/manual#updater_id", JsString(userInfo.id)).+("http://hbp.eu/manual#update_timestamp", JsNumber(new DateTime().getMillis)).-("@context").-("@id").-("links").-("nxv:rev").-("nxv:deprecated")
           ws.url(s"$nexusEndpoint/v0/data/${Instance.getIdfromURL(manualEntityId)}/?rev=$manualEntityRevision").addHttpHeaders("Authorization" -> token).put(
             cleanUpInstance
           )
@@ -393,7 +383,7 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
   }
 
   def getUserInfo(token: String): Future[UserInfo] = {
-    ws.url(oidcUserInfoEndpoint).addHttpHeaders("Authorization" -> token).get().map{
+    ws.url(oidcUserInfoEndpoint).addHttpHeaders("Authorization" -> token).get().map {
       res =>
         UserInfo(res.json.as[JsObject])
     }
@@ -403,7 +393,7 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
 
 object InstanceController {
 
-  def buildManualUpdatesFieldsFrequency(manualUpdates: IndexedSeq[Instance], currentUpdate:JsObject): Map[String, SortedSet[(JsValue, Int)]] = {
+  def buildManualUpdatesFieldsFrequency(manualUpdates: IndexedSeq[Instance], currentUpdate: JsObject): Map[String, SortedSet[(JsValue, Int)]] = {
     val cleanMap: IndexedSeq[Map[String, JsValue]] = currentUpdate.as[Map[String, JsValue]] +: cleanListManualData(manualUpdates)
     buildMapOfSortedManualUpdates(cleanMap)
   }
@@ -411,7 +401,7 @@ object InstanceController {
   // build reconciled view from updates statistics
   def reconcilationLogic(frequencies: Map[String, SortedSet[(JsValue, Int)]], origin: JsObject): JsObject = {
     // simple logic: keep the most frequent
-    val transformations = frequencies.map{
+    val transformations = frequencies.map {
       case (pathString, freqs) => (JsFlattener.buildJsPathFromString(pathString), freqs.last._1)
     }.toSeq
     applyChanges(origin, transformations)
@@ -419,7 +409,7 @@ object InstanceController {
 
   // apply a set of transformation to an instance
   def applyChanges(instance: JsObject, changes: Seq[(JsPath, JsValue)]) = {
-    val obj = changes.foldLeft(instance){
+    val obj = changes.foldLeft(instance) {
       case (res, (path, value)) =>
         val updatedJson = updateJson(res, path, value)
         updatedJson
@@ -430,28 +420,33 @@ object InstanceController {
   // return an updated JsObject or the src object in case of failure
   def updateJson(instance: JsObject, path: JsPath, newValue: JsValue): JsObject = {
     val simpleUpdateTransformer = path.json.update(
-      of[JsValue].map{ _ => newValue}
+      of[JsValue].map { _ => newValue }
     )
     val res = instance.transform(simpleUpdateTransformer).getOrElse(instance)
     res
   }
 
-  def buildMapOfSortedManualUpdates(manualUpdates:IndexedSeq[Map[String, JsValue]]): Map[String, SortedSet[(JsValue, Int)]] = {
-    implicit val order = Ordering.fromLessThan[(JsValue, Int)]( _._2 < _._2)
+  def buildMapOfSortedManualUpdates(manualUpdates: IndexedSeq[Map[String, JsValue]]): Map[String, SortedSet[(JsValue, Int)]] = {
+    implicit val order = Ordering.fromLessThan[(JsValue, Int)](_._2 < _._2)
     // For each update
-    val tempMap = manualUpdates.foldLeft(Map.empty[String, List[JsValue]]){
+    val tempMap = manualUpdates.foldLeft(Map.empty[String, List[JsValue]]) {
       case (merged, m) =>
-        val tempRes = m.foldLeft(merged) { case (acc, (k, v)) =>
+        val tempRes: Map[String, List[JsValue]] = m.foldLeft(merged) { case (acc, (k, v)) =>
           acc.get(k) match {
-            case Some(existing) => acc.updated(k, v :: existing )
+            case Some(existing) => acc.updated(k, v :: existing)
             case None => acc.updated(k, List(v))
           }
         }
         tempRes
     }
-    val sortedSet = tempMap.filter(e => e._1 != "@type" && e._1 != "http://hbp.eu/manual#parent" && e._1 != "http://hbp.eu/manual#origin" && e._1 != "http://hbp.eu/manual#updater_id").map{ el =>
-      val e = el._2.groupBy(identity).mapValues(_.size)
-      el._1 -> SortedSet(e.toList: _*)
+    val sortedSet = tempMap
+      .filter(e => e._1 != "@type" &&
+        e._1 != "http://hbp.eu/manual#parent" &&
+        e._1 != "http://hbp.eu/manual#origin" &&
+        e._1 != "http://hbp.eu/manual#updater_id")
+      .map { el =>
+        val e = el._2.groupBy(identity).mapValues(_.size)
+        el._1 -> SortedSet(e.toList: _*)
     }
     sortedSet
   }
@@ -467,18 +462,23 @@ object InstanceController {
       }
     }
   }
-  def cleanListManualData( manualUpdates: IndexedSeq[Instance]): IndexedSeq[Map[String, JsValue]] = {
-    manualUpdates.map( el => cleanManualDataFromNexus( el.content))
+
+  def cleanListManualData(manualUpdates: IndexedSeq[Instance]): IndexedSeq[Map[String, JsValue]] = {
+    manualUpdates.map(el => cleanManualDataFromNexus(el.content))
   }
 
   def cleanManualDataFromNexus(jsObject: JsObject): Map[String, JsValue] = {
     cleanManualData(jsObject).fields.toMap
   }
 
-  def cleanManualData(jsObject: JsObject):JsObject = {
+  def cleanManualData(jsObject: JsObject): JsObject = {
     jsObject.-("@id").-("@type").-("links").-("nxv:rev").-("nxv:deprecated")
   }
 
+  def cleanUpInstanceForSave(instance: Instance): JsObject = {
+    val jsonObj = instance.content
+    jsonObj - ("@context") - ("@type") - ("@id") - ("nxv:rev") - ("nxv:deprecated") - ("links")
+  }
 
 
   // NOTE
@@ -488,13 +488,16 @@ object InstanceController {
 
   def formatForReconcile(manualUpdates: IndexedSeq[JsValue], originJson: JsValue): (JsValue, JsValue) = {
     val allResults = manualUpdates.map((jsonResult) => (jsonResult \ "source").as[JsValue]).+:(originJson)
-    val contents = allResults.foldLeft(Json.arr())((array, jsonResult) => array.+:(toReconcileFormat(jsonResult, (jsonResult \ "@id").as[String])))
-    val priorities: JsValue = allResults.foldLeft(Json.obj())((jsonObj, jsResult) => jsonObj.+((jsResult \ "@id").as[String], Json.toJson(getPriority((jsResult \ "@id").as[String]))))
+    val contents = allResults.foldLeft(Json.arr())(
+      (array, jsonResult) =>
+        array.+:(toReconcileFormat(jsonResult, (jsonResult \ "@id").as[String]))
+    )
+    val priorities: JsValue = allResults.foldLeft(Json.obj())(
+      (jsonObj, jsResult) =>
+        jsonObj + ((jsResult \ "@id").as[String], Json.toJson(getPriority((jsResult \ "@id").as[String])))
+    )
     (contents, priorities)
   }
-
-
-
 
 
   def cleanInstanceManual(jsObject: JsObject): JsObject = {
@@ -506,24 +509,27 @@ object InstanceController {
   def formatInstanceList(jsArray: JsArray): JsValue = {
 
     val arr = jsArray.value.map { el =>
-      val id = ( el \ "instance" \ "value").as[String]
+      val id = (el \ "instance" \ "value").as[String]
       val name = (el \ "name" \ "value").as[JsString]
       val description: JsString = if ((el \ "description").isDefined) {
         (el \ "description" \ "value").as[JsString]
-      } else JsString("")
+      } else {
+        JsString("")
+      }
       Json.obj("id" -> Instance.getIdfromURL(id), "description" -> description, "label" -> name)
     }
     Json.toJson(arr)
   }
 
-  def formatFromNexusToOption(jsObject: JsObject):JsObject = {
-    val id = ( jsObject \ "@id").as[String]
+  def formatFromNexusToOption(jsObject: JsObject): JsObject = {
+    val id = (jsObject \ "@id").as[String]
     val name = (jsObject \ "http://schema.org/name").as[JsString]
     val description: JsString = if ((jsObject \ "http://schema.org/description").isDefined) {
       (jsObject \ "http://schema.org/description").as[JsString]
     } else JsString("")
     Json.obj("id" -> Instance.getIdfromURL(id), "description" -> description, "label" -> name)
   }
+
   def toReconcileFormat(jsValue: JsValue, privateSpace: String) = {
     Json.obj("src" -> privateSpace, "content" -> jsValue.as[JsObject].-("@context"))
   }
@@ -538,11 +544,40 @@ object InstanceController {
   }
 
   def getCurrentInstanceDisplayed(currentReconciledInstances: Seq[Instance], originalInstance: Instance): Instance = {
-    if(currentReconciledInstances.nonEmpty) {
+    if (currentReconciledInstances.nonEmpty) {
       val sorted = currentReconciledInstances.sortWith((left, right) => (left.content \ "http://hbp.eu/reconciled#update_timestamp").as[Long] > (right.content \ "http://hbp.eu/reconciled#update_timestamp").as[Long])
       sorted.head
     } else originalInstance
   }
+
+  def generateAlternatives(manualUpdates: IndexedSeq[Instance]): JsValue = {
+    // Alternatives are added per user
+    // So for each key we have a list of object containing the user id and the value
+    val alternatives: Map[String, Seq[(Long, JsValue)]] = manualUpdates
+      .map { instance =>
+        val dataMap: Map[String, JsValue] = cleanUpInstanceForSave(instance).-("http://hbp.eu/manual#parent")
+          .-("http://hbp.eu/manual#origin").as[Map[String, JsValue]]
+        val userId: Long = dataMap("http://hbp.eu/manual#updater_id").as[Long]
+        dataMap.map { case (k, v) => k -> ( userId, v) }
+      }.foldLeft(Map.empty[String, Seq[(Long, JsValue)]]) { case (map, instance) =>
+      //Grouping per field in order to have a map with the field and the list of different alternatives on this field
+      val tmp: List[(String, Seq[(Long, JsValue)])] = instance.map { case (k, v) => (k, Seq(v)) }.toList ++ map.toList
+      tmp
+        .filter(el =>  el._1 !="http://hbp.eu/manual#update_timestamp" && el._1 != "http://hbp.eu/manual#updater_id")
+        .groupBy(_._1).map { case (k, v) => k -> v.flatMap(_._2) }
+    }
+
+    val perValue = alternatives.map{
+      case (k,v) =>
+        val tempMap = v.foldLeft(Map.empty[JsValue, Seq[Long]]){case (map, tuple) =>
+          val temp: Seq[Long] = map.getOrElse(tuple._2, Seq.empty[Long])
+            map.updated(tuple._2, tuple._1 +: temp)
+        }
+        k ->  tempMap.toList.sortWith( (el1, el2) => el1._2.length > el2._2.length).map( el => Json.obj("value" -> el._1, "updater_id" -> el._2))
+    }
+    Json.toJson(perValue)
+  }
+
 
 
 }
