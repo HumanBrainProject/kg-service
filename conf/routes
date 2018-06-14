@@ -7,6 +7,17 @@
 
 POST    /privatespace                   controllers.KGController.createPrivateSpace()
 
+
+#KG Editor routes
+
+GET    /api/nodetypes                  controllers.Nodetype.list( privateSpace: String ?= "minds")
+GET    /api/instances/*nodetype         controllers.InstanceController.list(nodetype: String)
+GET    /api/instance/*id                 controllers.InstanceController.get(id: String)
+POST   /api/instance/*id                 controllers.InstanceController.update(id: String)
+POST   /api/schema/:organization/:domain/:entityType/:version  controllers.KGController.createSchema(organization: String, domain: String, entityType: String, version: String)
+
+
+
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file                   controllers.Assets.versioned(path="/public", file: Asset)
 

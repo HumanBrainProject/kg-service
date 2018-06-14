@@ -16,6 +16,7 @@ libraryDependencies += "com.typesafe.play" %% "play-iteratees" % "2.6.1"
 libraryDependencies += "de.leanovate.play-mockws" %% "play-mockws" % "2.6.2" % Test
 libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "3.1.2" % Test
 libraryDependencies += "com.github.stijndehaes" %% "play-prometheus-filters" % "0.3.2"
+libraryDependencies += "org.json4s" %% "json4s-native" % "3.6.0-M3"
 
 // Apache poi support (excel)
 libraryDependencies += "org.apache.poi" % "poi" % "3.17"
