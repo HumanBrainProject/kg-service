@@ -19,7 +19,8 @@ object Formatter {
   }
 
   def getJsonStringFromKV(key: String, rawValue: String, childrenValueOpt: Option[String]): String = {
-    val value = rawValue.replace("\n", " ")
+    // escape new line if quoted string content
+    val value = if (rawValue.charAt(0) == '"') rawValue.replace("\n", "\\n") else rawValue
     val childrenValue = childrenValueOpt match {
       case Some(childrenVal) => s"""  "$childrenLabel": [ $childrenVal ], """
       case None => ""
