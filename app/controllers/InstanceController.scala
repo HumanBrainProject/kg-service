@@ -131,6 +131,33 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
     }
   }
 
+  def getSpecificReconciledInstance(id:String, revision:Int): Action[AnyContent] = Action.async { implicit request =>
+    val token = request.headers.get("Authorization").getOrElse("")
+    val nexusPath = NexusPath(id.split("/").toList)
+    ws.url(s"https://$nexusEndpoint/v0/data/$id?rev=$revision&deprecated=false&fields=all").withHttpHeaders("Authorization" -> token).get().map{
+      response => response.status match {
+        case 200 =>
+          val json = response.json
+          val nexusId = Instance.getIdfromURL((json \ "http://hbp.eu/reconciled#original_parent" \ "@id").as[String])
+          val datatype = nexusId.splitAt(nexusId.lastIndexOf("/"))
+          val originalDatatype = NexusPath(datatype._1.split("/").toList)
+          FormHelper.getFormStructure(originalDatatype, response.json) match {
+            case JsNull => NotImplemented("Form template is not yet implemented")
+            case json => Ok(json)
+          }
+        case _ =>
+          Result(
+            ResponseHeader(
+              response.status,
+              flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](response.headers))
+            ),
+            HttpEntity.Strict(response.bodyAsBytes, getContentType(response.headers))
+          )
+      }
+
+    }
+  }
+
 
   def retrieveIncomingLinks(originalInstance: Instance,
                             token: String): Future[IndexedSeq[Instance]] = {
