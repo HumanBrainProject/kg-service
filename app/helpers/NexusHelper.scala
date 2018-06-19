@@ -3,7 +3,7 @@ package helpers
 import play.api.Configuration
 import play.api.libs.json._
 import play.api.libs.ws.{WSClient, WSResponse}
-
+import play.api.http.Status._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ExecutionContext, Future}
@@ -58,6 +58,12 @@ object NexusHelper {
     }
     """
 
+  def domainDefinition(description: String): JsObject = {
+    Json.obj(
+      "description" -> description
+    )
+  }
+
   def createSchema(org: String, entityType: String, space: String, version: String, token: String)(implicit config: Configuration, ws: WSClient, ec: ExecutionContext): Future[WSResponse] = {
 
     val nexusUrl = config.get[String](s"nexus.endpoint")
@@ -82,9 +88,30 @@ object NexusHelper {
           Future.successful(response)
       }
     }
-
-
   }
+
+  def createDomain(org: String, domain: String, domainDescription: String, token: String)(implicit config: Configuration, ws: WSClient, ec: ExecutionContext): Future[WSResponse] = {
+    assert(domain.forall(_.isLetterOrDigit))
+    val nexusUrl = config.get[String](s"nexus.endpoint")
+    val schemaUrl = s"${nexusUrl}/v0/domains/$org/${domain.toLowerCase}/"
+    ws.url(schemaUrl).addHttpHeaders("Authorization" -> token).get().flatMap{
+      response => response.status match {
+        case OK => // schema exists already
+          Future.successful(response)
+        case NOT_FOUND => // schema not found, create it
+          val payload = domainDefinition(domainDescription)
+          ws.url(schemaUrl).addHttpHeaders("Authorization" -> token).put(payload).flatMap{
+            domainCreationResponse => domainCreationResponse.status match {
+              case _ =>
+                Future.successful(response)
+            }
+          }
+        case _ =>
+          Future.successful(response)
+      }
+    }
+  }
+
 
   def listAllNexusResult(url: String, token: String)(implicit ws: WSClient, ec: ExecutionContext): Future[Seq[JsValue]] = {
     val sizeLimit = 5

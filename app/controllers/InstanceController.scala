@@ -99,7 +99,6 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
             )
         }
     }
-
     res
   }
 
@@ -134,9 +133,11 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
   def getSpecificReconciledInstance(id:String, revision:Int): Action[AnyContent] = Action.async { implicit request =>
     val token = request.headers.get("Authorization").getOrElse("")
     val nexusPath = NexusPath(id.split("/").toList)
-    ws.url(s"https://$nexusEndpoint/v0/data/$id?rev=$revision&deprecated=false&fields=all").withHttpHeaders("Authorization" -> token).get().map{
+    ws
+      .url(s"https://$nexusEndpoint/v0/data/$id?rev=$revision&deprecated=false&fields=all")
+      .withHttpHeaders("Authorization" -> token).get().map{
       response => response.status match {
-        case 200 =>
+        case OK =>
           val json = response.json
           val nexusId = Instance.getIdfromURL((json \ "http://hbp.eu/reconciled#original_parent" \ "@id").as[String])
           val datatype = nexusId.splitAt(nexusId.lastIndexOf("/"))
@@ -250,7 +251,7 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
     ws.url(s"$nexusEndpoint/v0/data/$id?fields=all").addHttpHeaders("Authorization" -> token).get().map {
       res =>
         res.status match {
-          case 200 =>
+          case OK =>
             val json = res.json
             // Get data from manual space
             Right(Instance(json))
@@ -330,8 +331,8 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
                   logger.debug(s"Result from reconciled upsert: ${createReconciledInstance.status}")
                   logger.debug(createReconciledInstance.body)
                   (createReconciledInstance.status, createdInManualSpace.status) match {
-                    case (200, 200) => Ok(InstanceController.formatFromNexusToOption(updatedInstance))
-                    case (200, _) => Result(
+                    case (OK, OK) => Ok(InstanceController.formatFromNexusToOption(updatedInstance))
+                    case (OK, _) => Result(
                       ResponseHeader(
                         createdInManualSpace.status,
                         flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](createdInManualSpace.headers))
@@ -386,10 +387,12 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
         NexusHelper.createSchema(destinationOrg, originalInstance.nexusPath.schema.capitalize, space, originalInstance.nexusPath.version, token).map {
           response =>
             response.status match {
-              case 200 => schemasHashMap.loadManualSchemaList(token)
-                logger.info(s"Schema created properly for : $space/${originalInstance.nexusPath.schema}/${originalInstance.nexusPath.version}")
+              case OK => schemasHashMap.loadManualSchemaList(token)
+                logger.info(s"Schema created properly for : " +
+                  s"$space/${originalInstance.nexusPath.schema}/${originalInstance.nexusPath.version}")
                 Future.successful(true)
-              case _ => logger.error(s"ERROR - schema does not exist and automatic creation failed - ${response.body}")
+              case _ => logger.error(s"ERROR - schema does not exist and " +
+                s"automatic creation failed - ${response.body}")
                 Future.successful(false)
             }
         }
@@ -442,7 +445,7 @@ object InstanceController {
   }
 
   // apply a set of transformation to an instance
-  def applyChanges(instance: JsObject, changes: Seq[(JsPath, JsValue)]) = {
+  def applyChanges(instance: JsObject, changes: Seq[(JsPath, JsValue)]): JsObject = {
     val obj = changes.foldLeft(instance) {
       case (res, (path, value)) =>
         val updatedJson = updateJson(res, path, value)
@@ -514,8 +517,14 @@ object InstanceController {
     jsonObj - ("@context") - ("@type") - ("@id") - ("nxv:rev") - ("nxv:deprecated") - ("links")
   }
 
-  def prepareManualEntityForStorage(manualEntity: JsObject, userInfo:UserInfo): JsObject = {
-    manualEntity.+("http://hbp.eu/manual#updater_id", JsString(userInfo.id)).+("http://hbp.eu/manual#update_timestamp", JsNumber(new DateTime().getMillis)).-("@context").-("@id").-("links").-("nxv:rev").-("nxv:deprecated")
+  def prepareManualEntityForStorage(manualEntity: JsObject, userInfo: UserInfo): JsObject = {
+    manualEntity.+("http://hbp.eu/manual#updater_id", JsString(userInfo.id))
+      .+("http://hbp.eu/manual#update_timestamp", JsNumber(new DateTime().getMillis))
+      .-("@context")
+      .-("@id")
+      .-("links")
+      .-("nxv:rev")
+      .-("nxv:deprecated")
   }
 
 
@@ -564,11 +573,11 @@ object InstanceController {
     val name = (jsObject \ "http://schema.org/name").as[JsString]
     val description: JsString = if ((jsObject \ "http://schema.org/description").isDefined) {
       (jsObject \ "http://schema.org/description").as[JsString]
-    } else JsString("")
+    } else { JsString("") }
     Json.obj("id" -> Instance.getIdfromURL(id), "description" -> description, "label" -> name)
   }
 
-  def toReconcileFormat(jsValue: JsValue, privateSpace: String) = {
+  def toReconcileFormat(jsValue: JsValue, privateSpace: String): JsObject = {
     Json.obj("src" -> privateSpace, "content" -> jsValue.as[JsObject].-("@context"))
   }
 
@@ -583,11 +592,14 @@ object InstanceController {
 
   def getCurrentInstanceDisplayed(currentReconciledInstances: Seq[Instance], originalInstance: Instance): Instance = {
     if (currentReconciledInstances.nonEmpty) {
-      val sorted = currentReconciledInstances.sortWith((left, right) =>
-        (left.content \ "http://hbp.eu/reconciled#update_timestamp").as[Long] > (right.content \ "http://hbp.eu/reconciled#update_timestamp").as[Long]
-      )
+      val sorted = currentReconciledInstances.sortWith { (left, right) =>
+        (left.content \ "http://hbp.eu/reconciled#update_timestamp").as[Long] >
+          (right.content \ "http://hbp.eu/reconciled#update_timestamp").as[Long]
+      }
       sorted.head
-    } else originalInstance
+    } else{
+      originalInstance
+    }
   }
 
   def generateAlternatives(manualUpdates: IndexedSeq[JsObject]): JsValue = {
