@@ -25,6 +25,14 @@ GET     /assets/*file                   controllers.Assets.versioned(path="/publ
 # Extract data from a dataworkbench templated excel file
 POST    /api/dataworkbench/extractDataFromExcel           controllers.ExcelFileImporterController.extractDataFromExcel(action: Option[String])
 
+
+# Auth
+
+
+GET     /auth/groups                         controllers.Authentication.OIDCController.groups
+OPTIONS /auth/groups                         controllers.Authentication.OIDCController.groupsOptions
+
+
 # Monitoring
 
 GET     /metrics                        com.github.stijndehaes.playprometheusfilters.controllers.PrometheusController.getMetrics
