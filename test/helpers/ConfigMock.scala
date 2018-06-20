@@ -7,12 +7,14 @@ object ConfigMock {
   val reconcileEndpoint: String = "http://www.reconcile.com"
   val blazegraphNameSpace: String = "kg"
   val sparqlEndpoint = "http://blazegraph:9999"
+  val idm = "https://services.humanbrainproject.eu/idm/v1/api"
 
   val fakeApplicationConfig = GuiceApplicationBuilder().configure(
     "play.http.filters" -> "play.api.http.NoHttpFilters",
     "nexus.endpoint" -> nexusEndpoint,
     "reconcile.endpoint" -> reconcileEndpoint,
     "blazegraph.namespace" -> blazegraphNameSpace,
-    "blazegraph.endpoint" -> sparqlEndpoint
+    "blazegraph.endpoint" -> sparqlEndpoint,
+    "idm.api" -> idm
   )
 }

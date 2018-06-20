@@ -15,6 +15,7 @@ libraryDependencies += ws
 libraryDependencies += "com.typesafe.play" %% "play-iteratees" % "2.6.1"
 libraryDependencies += "de.leanovate.play-mockws" %% "play-mockws" % "2.6.2" % Test
 libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "3.1.2" % Test
+libraryDependencies += "org.mockito" % "mockito-core" % "2.19.0" % Test
 libraryDependencies += "com.github.stijndehaes" %% "play-prometheus-filters" % "0.3.2"
 libraryDependencies += "org.json4s" %% "json4s-native" % "3.6.0-M3"
 

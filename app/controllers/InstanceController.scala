@@ -16,7 +16,7 @@
 
 package controllers
 
-import helpers.{BlazegraphHelper, FormHelper, JsFlattener, NexusHelper}
+import helpers._
 import javax.inject.Inject
 import play.api.{Configuration, Logger}
 import play.api.http.HttpEntity
@@ -28,14 +28,13 @@ import helpers.ResponseHelper._
 import models.{InMemoryKnowledge, Instance, NexusPath, UserInfo}
 import org.joda.time.DateTime
 import org.json4s.{Diff, JsonAST}
-import org.json4s.JsonAST.JNothing
 import org.json4s.native.{JsonMethods, JsonParser}
 
 import scala.collection.immutable.SortedSet
 import scala.concurrent.{ExecutionContext, Future}
 
 
-class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: ExecutionContext, ws: WSClient, config: Configuration)
+class InstanceController @Inject()(cc: ControllerComponents, authenticatedUserAction: AuthenticatedUserAction)(implicit ec: ExecutionContext, ws: WSClient, config: Configuration)
   extends AbstractController(cc) {
   val blazegraphNameSpace = config.getOptional[String]("blazegraph.namespace").getOrElse("kg")
   val nexusEndpoint = config.getOptional[String]("nexus.endpoint").getOrElse("https://nexus-dev.humanbrainproject.org")
@@ -43,7 +42,6 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
   val reconciledSpace = config.getOptional[String]("nexus.reconciledspace").getOrElse("reconciled/poc")
   val manualSpace = config.getOptional[String]("nexus.manualspace").getOrElse("manual/poc")
   val sparqlEndpoint = config.getOptional[String]("blazegraph.endpoint").getOrElse("http://localhost:9999")
-  val oidcUserInfoEndpoint = config.get[String]("oidc.userinfo")
   val inMemoryManualSpaceSchemas = new InMemoryKnowledge(manualSpace)
   val inMemoryReconciledSpaceSchemas = new InMemoryKnowledge(reconciledSpace)
 
@@ -300,59 +298,63 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
     request.headers.toMap.getOrElse("Authorization", Seq("")).head
   }
 
-  def update(id: String): Action[AnyContent] = Action.async { implicit request =>
+  def update(id: String): Action[AnyContent] = authenticatedUserAction.async { implicit request =>
     val token = request.headers.get("Authorization").getOrElse("")
     //    val orgContentFuture = retrieve(id, request.headers) // call core of get id
-    val newValue = request.body.asJson.get
-    retrieveOriginalInstance(id, token).flatMap[Result] {
-      case Left(res) => Future.successful(Result(ResponseHeader(res.status, flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](res.headers))),
-        HttpEntity.Strict(res.bodyAsBytes, getContentType(res.headers))))
-      case Right(originalInstance) =>
-        retrieveIncomingLinks(originalInstance, token).flatMap[Result] {
-          incomingLinks =>
-            val currentReconciledInstances = incomingLinks.filter(instance => instance.nexusPath.toString() contains reconciledSpace)
-            val currentInstanceDisplayed = InstanceController.getCurrentInstanceDisplayed(currentReconciledInstances, originalInstance)
+    if(request.user.isDefined){
+      val newValue = request.body.asJson.get
+      retrieveOriginalInstance(id, token).flatMap[Result] {
+        case Left(res) => Future.successful(Result(ResponseHeader(res.status, flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](res.headers))),
+          HttpEntity.Strict(res.bodyAsBytes, getContentType(res.headers))))
+        case Right(originalInstance) =>
+          retrieveIncomingLinks(originalInstance, token).flatMap[Result] {
+            incomingLinks =>
+              val currentReconciledInstances = incomingLinks.filter(instance => instance.nexusPath.toString() contains reconciledSpace)
+              val currentInstanceDisplayed = InstanceController.getCurrentInstanceDisplayed(currentReconciledInstances, originalInstance)
 
-            // As we cannot pass / in the name of a field we have replaced them with %nexus-slash%
-            val updateFromUI = Json.parse(FormHelper.unescapeSlash(newValue.toString())).as[JsObject] - "id"
-            val updatedInstance = buildInstanceFromForm(originalInstance.content, updateFromUI)
-            val updateToBeStoredInManual = buildDiffEntity(currentInstanceDisplayed, updatedInstance.toString, originalInstance) + ("@type", JsString(s"http://hbp.eu/manual#${originalInstance.nexusPath.schema.capitalize}"))
-            val userInfoFuture = getUserInfo(getTokenFromRequest(request))
-            consolidateFromManualSpace(originalInstance, incomingLinks, updateToBeStoredInManual) match {
-              case (consolidatedInstance, manualEntitiesDetailsOpt) =>
-                logger.debug(s"Consolidated instance $updatedInstance")
-                val re: Future[Result] = for {
-                  createdSchemas <- createManualSchemaIfNeeded(updateToBeStoredInManual, originalInstance, token, inMemoryManualSpaceSchemas, manualSpace, "manual")
-                  userInfo <- userInfoFuture
-                  preppedEntityForStorage = InstanceController.prepareManualEntityForStorage(updateToBeStoredInManual, userInfo)
-                  createdInManualSpace <- upsertUpdateInManualSpace(manualEntitiesDetailsOpt, userInfo, originalInstance.nexusPath.schema, preppedEntityForStorage, token)
-                  createReconciledInstance <- upsertReconciledInstance(incomingLinks, originalInstance, preppedEntityForStorage, updatedInstance, consolidatedInstance, token, userInfo)
-                } yield {
-                  logger.debug(s"Result from reconciled upsert: ${createReconciledInstance.status}")
-                  logger.debug(createReconciledInstance.body)
-                  (createReconciledInstance.status, createdInManualSpace.status) match {
-                    case (OK, OK) => Ok(InstanceController.formatFromNexusToOption(updatedInstance))
-                    case (OK, _) => Result(
-                      ResponseHeader(
-                        createdInManualSpace.status,
-                        flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](createdInManualSpace.headers))
-                      ),
-                      HttpEntity.Strict(createdInManualSpace.bodyAsBytes, getContentType(createdInManualSpace.headers))
-                    )
-                    case (_, _) =>
-                      Result(
+              // As we cannot pass / in the name of a field we have replaced them with %nexus-slash%
+              val updateFromUI = Json.parse(FormHelper.unescapeSlash(newValue.toString())).as[JsObject] - "id"
+              val updatedInstance = buildInstanceFromForm(originalInstance.content, updateFromUI)
+              val userInfo = request.user.get
+              val updateToBeStoredInManual = buildDiffEntity(currentInstanceDisplayed, updatedInstance.toString, originalInstance) + ("@type", JsString(s"http://hbp.eu/manual#${originalInstance.nexusPath.schema.capitalize}"))
+              consolidateFromManualSpace(originalInstance, incomingLinks, updateToBeStoredInManual) match {
+                case (consolidatedInstance, manualEntitiesDetailsOpt) =>
+                  logger.debug(s"Consolidated instance $updatedInstance")
+                  val re: Future[Result] = for {
+                    createdSchemas <- createManualSchemaIfNeeded(updateToBeStoredInManual, originalInstance, token, inMemoryManualSpaceSchemas, manualSpace, "manual")
+                    preppedEntityForStorage = InstanceController.prepareManualEntityForStorage(updateToBeStoredInManual, userInfo)
+                    createdInManualSpace <- upsertUpdateInManualSpace(manualEntitiesDetailsOpt, userInfo, originalInstance.nexusPath.schema, preppedEntityForStorage, token)
+                    createReconciledInstance <- upsertReconciledInstance(incomingLinks, originalInstance, preppedEntityForStorage, updatedInstance, consolidatedInstance, token, userInfo)
+                  } yield {
+                    logger.debug(s"Result from reconciled upsert: ${createReconciledInstance.status}")
+                    logger.debug(createReconciledInstance.body)
+                    (createReconciledInstance.status, createdInManualSpace.status) match {
+                      case (OK, OK) => Ok(InstanceController.formatFromNexusToOption(updatedInstance))
+                      case (OK, _) => Result(
                         ResponseHeader(
-                          createReconciledInstance.status,
-                          flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](createReconciledInstance.headers))
+                          createdInManualSpace.status,
+                          flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](createdInManualSpace.headers))
                         ),
-                        HttpEntity.Strict(createReconciledInstance.bodyAsBytes, getContentType(createReconciledInstance.headers))
+                        HttpEntity.Strict(createdInManualSpace.bodyAsBytes, getContentType(createdInManualSpace.headers))
                       )
+                      case (_, _) =>
+                        Result(
+                          ResponseHeader(
+                            createReconciledInstance.status,
+                            flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](createReconciledInstance.headers))
+                          ),
+                          HttpEntity.Strict(createReconciledInstance.bodyAsBytes, getContentType(createReconciledInstance.headers))
+                        )
+                    }
                   }
-                }
-                re
-            }
-        }
+                  re
+              }
+          }
+      }
+    }else {
+      Future.successful(Forbidden("You need to login in order"))
     }
+
   }
 
   def upsertReconciledInstance(instances: IndexedSeq[Instance], originalInstance: Instance,
@@ -415,14 +417,6 @@ class InstanceController @Inject()(cc: ControllerComponents)(implicit ec: Execut
       ws.url(s"$nexusEndpoint/v0/data/$manualSpace/${schema}/v0.0.4").addHttpHeaders("Authorization" -> token).post(
         manualEntity + ("http://hbp.eu/manual#updater_id", JsString(userInfo.id))
       )
-    }
-  }
-
-
-  def getUserInfo(token: String): Future[UserInfo] = {
-    ws.url(oidcUserInfoEndpoint).addHttpHeaders("Authorization" -> token).get().map {
-      res =>
-        UserInfo(res.json.as[JsObject])
     }
   }
 

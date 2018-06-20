@@ -15,10 +15,13 @@
 */
 package controllers
 
+import helpers.AuthenticatedUserAction
 import mockws.{MockWS, MockWSHelpers}
 import models.{Instance, NexusPath}
+import org.scalatest._
 import org.scalatest.Matchers._
 import org.scalatest.mockito.MockitoSugar
+import org.scalatest.mockito._
 import org.scalatestplus.play._
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import play.api.Application
@@ -28,11 +31,10 @@ import play.api.mvc._
 import play.api.test._
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Injecting}
-
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
-class InstanceControllerSpec extends PlaySpec with GuiceOneAppPerSuite with MockWSHelpers with Injecting {
+class InstanceControllerSpec extends PlaySpec with GuiceOneAppPerSuite with MockWSHelpers with MockitoSugar with Injecting {
 
   import helpers.ConfigMock._
 
@@ -67,9 +69,10 @@ class InstanceControllerSpec extends PlaySpec with GuiceOneAppPerSuite with Mock
           Ok(jsonResp)
         }
       }
+      val authMock = mock[AuthenticatedUserAction]
       val mockCC = stubControllerComponents()
       val ec = global
-      val controller = new InstanceController(mockCC)(ec, ws, fakeApplication().configuration)
+      val controller = new InstanceController(mockCC, authMock)(ec, ws, fakeApplication().configuration)
       val res = contentAsString(controller.list(datatype).apply(FakeRequest()))
       res mustBe """{"data":[{"id":"/data/core/datatype/v0.0.4/123","description":"","label":"dataname1"},{"id":"/data/core/datatype/v0.0.4/321","description":"","label":"dataname2"}],"label":"data/core/datatype/v0.0.4"}"""
 
@@ -143,7 +146,8 @@ class InstanceControllerSpec extends PlaySpec with GuiceOneAppPerSuite with Mock
       }
       val mockCC = stubControllerComponents()
       val ec = global
-      val controller = new InstanceController(mockCC)(ec, ws, fakeApplication().configuration)
+      val authMock = mock[AuthenticatedUserAction]
+      val controller = new InstanceController(mockCC, authMock)(ec, ws, fakeApplication().configuration)
       val res = contentAsString(controller.getSpecificReconciledInstance(id, revision).apply(FakeRequest()))
       res mustBe s"""{"fields":{"id":{"value":{"path":"minds/core/activity/v0.0.4","nexus_id":"https://nexus-dev.humanbrainproject.org/v0/data/reconcile/poc/datatype/v0.0.4/123"}},"http:%nexus-slash%%nexus-slash%schema.org%nexus-slash%name":{"type":"InputText","label":"Name","value":"365.A.e.#2"},"http:%nexus-slash%%nexus-slash%schema.org%nexus-slash%description":{"type":"TextArea","label":"Description","value":"The setting"},"http:%nexus-slash%%nexus-slash%hbp.eu%nexus-slash%minds#ethicsApproval":{"type":"DropdownSelect","label":"Approval","optionsUrl":"/api/instances/minds/ethics/approval/v0.0.4","mappingValue":"id","mappingLabel":"label","isLink":true,"value":[{"id":"minds/ethics/approval/v0.0.4/94383d63-7587-4bc0-a834-629a9be757e9"}]},"http:%nexus-slash%%nexus-slash%hbp.eu%nexus-slash%minds#ethicsAuthority":{"type":"DropdownSelect","label":"Authority","optionsUrl":"/api/instances/minds/ethics/authority/v0.0.4","mappingValue":"id","mappingLabel":"label","isLink":true,"value":[{"id":"minds/ethics/authority/v0.0.4/9bfc1378-44ca-4630-97b0-927266a0de73"}]},"http:%nexus-slash%%nexus-slash%hbp.eu%nexus-slash%minds#methods":{"type":"DropdownSelect","label":"Methods","optionsUrl":"/api/instances/minds/experiment/methods/v0.0.4","mappingValue":"id","mappingLabel":"label","isLink":true,"value":[{"id":"minds/experiment/method/v0.0.4/5481f012-fa64-4b0a-8614-648f09002519"}]},"http:%nexus-slash%%nexus-slash%hbp.eu%nexus-slash%minds#preparation":{"type":"DropdownSelect","label":"Preparation","optionsUrl":"/api/instances/minds/core/preparation/v0.0.4","mappingValue":"id","mappingLabel":"label","isLink":true,"value":[{"id":"minds/core/preparation/v0.0.4/33f9c5e0-0336-41c9-838a-e0a2dd74bd76"}]},"http:%nexus-slash%%nexus-slash%hbp.eu%nexus-slash%minds#protocols":{"type":"DropdownSelect","label":"Protocols","optionsUrl":"/api/instances/minds/experiment/protocol/v0.0.4","mappingValue":"id","mappingLabel":"label","isLink":true,"value":[{"id":"minds/experiment/protocol/v0.0.4/68f34f9a-37e3-48fd-a098-86c68e1fea9d"}]}},"label":"Activity","editable":true,"ui_info":{"summary":["http://schema.org/name","http://schema.org/description"]},"alternatives":{}}"""
     }
