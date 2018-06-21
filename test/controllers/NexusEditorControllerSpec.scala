@@ -15,9 +15,8 @@
 */
 package controllers
 
-import authentication.models.OIDCAuthService
+import authentication.models.{AuthenticatedUserAction, OIDCAuthService}
 import mockws.{MockWS, MockWSHelpers}
-import nexus.common.helpers.AuthenticatedUserAction
 import nexus.common.models.NexusPath
 import nexus.editor.InstanceHelper
 import nexus.editor.models.Instance

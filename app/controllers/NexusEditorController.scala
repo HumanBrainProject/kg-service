@@ -17,9 +17,9 @@
 
 package controllers
 
+import authentication.models.AuthenticatedUserAction
 import core.ConfigurationHandler
 import javax.inject.Inject
-import nexus.common.helpers.AuthenticatedUserAction
 import nexus.common.models.NexusPath
 import nexus.editor.InstanceHelper
 import nexus.editor.InstanceHelper._

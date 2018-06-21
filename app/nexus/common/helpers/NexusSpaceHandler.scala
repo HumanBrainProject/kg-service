@@ -19,7 +19,7 @@ package nexus.common.helpers
 
 import nexus.editor.helpers.IDMHelper
 import play.api.Logger
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 import play.api.libs.ws.{EmptyBody, WSClient, WSResponse}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -95,34 +95,28 @@ object NexusSpaceHandler {
 
   def grantIAMrights(groupName: String, token: String, iamEndpoint: String)(implicit wSClient: WSClient): Future[WSResponse] = {
     val endpoint = iamEndpoint + s"/v0/acls/kg/$groupName"
-    val payload = aclPayload(groupName)
+    val payload = aclPayload( Seq(groupName, s"${groupName}-admin"), Seq(Seq("read"), Seq("read", "write", "own", "publish")) )
     wSClient.url(endpoint).addHttpHeaders("Authorization" -> token).put(payload)
   }
 
-  private def aclPayload(groupName: String): JsObject = {
+  private def aclPayload(groupsName: Seq[String], groupsGrants: Seq[Seq[String]]): JsObject = {
+    val aclsContent = JsArray(
+      groupsName.zip(groupsGrants).map {
+        case (groupName, groupGrants) =>
+          Json.obj(
+            "identity" -> Json.obj(
+              "realm" -> "HBP",
+              "group" -> s"nexus-$groupName",
+              "@type" -> "GroupRef"
+            ),
+            "permissions" -> JsArray(
+              groupGrants.map(JsString(_))
+            )
+          )
+      }
+    )
     Json.obj(
-      "acl" -> Json.arr(
-        Json.obj(
-          "identity" -> Json.obj(
-            "realm" -> "HBP",
-            "group" -> s"nexus-$groupName-admin",
-            "@type" -> "GroupRef"
-          ),
-          "permissions" -> Json.arr(
-            "read", "write", "own", "publish"
-          )
-        ),
-        Json.obj(
-          "identity" -> Json.obj(
-            "realm" -> "HBP",
-            "group" -> s"nexus-$groupName",
-            "@type" -> "GroupRef"
-          ),
-          "permissions" -> Json.arr(
-            "read"
-          )
-        )
-      )
+      "acl" -> aclsContent
     )
   }
 

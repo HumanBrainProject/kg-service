@@ -17,11 +17,10 @@
 
 package controllers
 
-import authentication.models.{OIDCAuthService, UserRequest}
+import authentication.models.{AuthenticatedUserAction, OIDCAuthService, UserRequest}
 import com.google.inject.Inject
 import core.ConfigurationHandler
 import javax.inject.Singleton
-import nexus.common.helpers.AuthenticatedUserAction
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
 import play.api.mvc._

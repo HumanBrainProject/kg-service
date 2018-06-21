@@ -15,9 +15,8 @@
 *   limitations under the License.
 */
 
-package nexus.common.helpers
+package authentication.models
 
-import authentication.models.{OIDCAuthService, UserRequest}
 import com.google.inject.Inject
 import play.api.mvc._
 
