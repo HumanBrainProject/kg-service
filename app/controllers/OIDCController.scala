@@ -1,3 +1,4 @@
+
 /*
 *   Copyright (c) 2018, EPFL/Human Brain Project PCO
 *
@@ -13,13 +14,13 @@
 *   See the License for the specific language governing permissions and
 *   limitations under the License.
 */
+
 package controllers
 
-import authentication.models.OIDCAuthService
+import authentication.models.{OIDCAuthService, UserRequest}
 import com.google.inject.Inject
 import core.ConfigurationHandler
 import javax.inject.Singleton
-import models.UserRequest
 import nexus.common.helpers.AuthenticatedUserAction
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient

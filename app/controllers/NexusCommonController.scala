@@ -1,3 +1,4 @@
+
 /*
 *   Copyright (c) 2018, EPFL/Human Brain Project PCO
 *
@@ -13,20 +14,19 @@
 *   See the License for the specific language governing permissions and
 *   limitations under the License.
 */
+
 package controllers
 
 import core.ConfigurationHandler
-import nexus.editor.helpers.ResponseHelper.{filterContentTypeAndLengthFromHeaders, flattenHeaders, getContentType}
-import nexus.editor.helpers.IDMHelper
 import javax.inject.{Inject, Singleton}
+import nexus.common.helpers.{NexusHelper, NexusSpaceHandler}
+import nexus.editor.helpers.ResponseHelper.{filterContentTypeAndLengthFromHeaders, flattenHeaders, getContentType}
+import play.api.Logger
 import play.api.http.HttpEntity
-import play.api.libs.json.{JsObject, Json}
-import play.api.libs.ws.{EmptyBody, WSClient, WSResponse}
+import play.api.libs.ws.WSClient
 import play.api.mvc._
-import play.api.{Configuration, Logger}
 
 import scala.concurrent.{ExecutionContext, Future}
-import nexus.common.helpers.{NexusHelper, NexusSpaceHandler}
 
 @Singleton
 class NexusCommonController @Inject()(cc: ControllerComponents)(implicit ec: ExecutionContext, ws: WSClient)
