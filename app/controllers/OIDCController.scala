@@ -33,7 +33,7 @@ import scala.concurrent.ExecutionContext
 class OIDCController @Inject()(cc: ControllerComponents,
                                authService: OIDCAuthService,
                                authenticatedUserAction: AuthenticatedUserAction)
-                              (implicit ec: ExecutionContext, ws: WSClient, config: Configuration)
+                              (implicit ec: ExecutionContext, ws: WSClient)
   extends AbstractController(cc) {
   val esHost: String = ConfigurationHandler.getString("es.host")
   val logger = Logger(this.getClass)

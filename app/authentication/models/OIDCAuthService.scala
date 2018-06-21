@@ -17,6 +17,7 @@
 
 package authentication.models
 
+import com.google.inject.Inject
 import core.ConfigurationHandler
 import nexus.editor.helpers.ESHelper
 import play.api.Logger
@@ -27,7 +28,7 @@ import play.api.mvc.Headers
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class OIDCAuthService (implicit ec: ExecutionContext,  ws: WSClient) extends AuthService {
+class OIDCAuthService @Inject() (implicit ec: ExecutionContext,  ws: WSClient) extends AuthService {
   val oidcUserInfoEndpoint = ConfigurationHandler.getString("auth.userinfo")
   val esHost: String = ConfigurationHandler.getString("es.host")
   val logger = Logger(this.getClass)

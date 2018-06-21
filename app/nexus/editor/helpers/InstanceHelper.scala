@@ -42,7 +42,7 @@ object InstanceHelper {
   val reconciledSpace = ConfigurationHandler.getOptionalString("nexus.reconciledspace").getOrElse("reconciled/poc")
   val manualSpace = ConfigurationHandler.getOptionalString("nexus.manualspace").getOrElse("manual/poc")
   val sparqlEndpoint = ConfigurationHandler.getOptionalString("blazegraph.endpoint").getOrElse("http://localhost:9999")
-  val oidcUserInfoEndpoint = ConfigurationHandler.getString("oidc.userinfo")
+  val oidcUserInfoEndpoint = ConfigurationHandler.getString("auth.userinfo")
   val logger = Logger(this.getClass)
 
   def retrieveIncomingLinks(originalInstance: Instance,

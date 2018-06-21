@@ -15,11 +15,14 @@
 */
 package controllers
 
+import authentication.models.OIDCAuthService
 import mockws.{MockWS, MockWSHelpers}
 import nexus.common.helpers.AuthenticatedUserAction
 import nexus.common.models.NexusPath
+import nexus.editor.InstanceHelper
 import nexus.editor.models.Instance
 import org.scalatest.Matchers._
+import org.scalatest.mockito.MockitoSugar
 import org.scalatestplus.play._
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import play.api.Application
@@ -27,27 +30,7 @@ import play.api.libs.json._
 import play.api.mvc.Results.Ok
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Injecting}
-import org.scalatest.mockito.MockitoSugar
-import org.scalatest.mockito._
-import org.mockito.Mockito._
-import mockws.{MockWS, MockWSHelpers}
-import nexus.editor.InstanceHelper
-import org.scalatest._
-import org.scalatest.Matchers._
-import org.scalatest.mockito.MockitoSugar
-import org.scalatest.mockito._
-import org.scalatestplus.play._
-import org.scalatestplus.play.guice.GuiceOneAppPerSuite
-import play.api.Application
-import play.api.libs.json._
-import play.api.mvc.Results.Ok
 import play.api.mvc._
-import play.api.test._
-import play.api.test.Helpers._
-import play.api.test.{FakeRequest, Injecting}
-
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
 
 class NexusEditorControllerSpec extends PlaySpec with GuiceOneAppPerSuite with MockWSHelpers with MockitoSugar with Injecting {
 
@@ -84,9 +67,10 @@ class NexusEditorControllerSpec extends PlaySpec with GuiceOneAppPerSuite with M
           Ok(jsonResp)
         }
       }
-      val authMock = mock[AuthenticatedUserAction]
+
       val mockCC = stubControllerComponents()
       val ec = global
+      val authMock = mock[AuthenticatedUserAction]
       val controller = new NexusEditorController(mockCC, authMock)(ec, ws)
       val res = contentAsString(controller.listInstances(datatype).apply(FakeRequest()))
       res mustBe """{"data":[{"id":"/data/core/datatype/v0.0.4/123","description":"","label":"dataname1"},{"id":"/data/core/datatype/v0.0.4/321","description":"","label":"dataname2"}],"label":"data/core/datatype/v0.0.4"}"""
