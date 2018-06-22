@@ -10,29 +10,30 @@ POST    /privatespace                   controllers.NexusCommonController.create
 
 #KG Editor routes
 
-GET    /api/nodetypes                  controllers.NexusEditorController.listEntities( privateSpace: String ?= "minds")
-GET    /api/instances/*nodetype         controllers.NexusEditorController.listInstances(nodetype: String)
-GET    /api/instance/*id                 controllers.NexusEditorController.getInstance(id: String)
-POST   /api/instance/*id                 controllers.NexusEditorController.updateInstance(id: String)
-POST   /api/schema/:organization/:domain/:entityType/:version  controllers.NexusCommonController.createSchema(organization: String, domain: String, entityType: String, version: String)
+GET    /api/nodetypes                                           controllers.NexusEditorController.listEntities( privateSpace: String ?= "minds")
+GET    /api/instances/*nodetype                                 controllers.NexusEditorController.listInstances(nodetype: String)
+GET    /api/instance/*id                                        controllers.NexusEditorController.getInstance(id: String)
+GET    /api/revisions/*id                      controllers.NexusEditorController.getInstanceNumberOfAvailableRevisions(id: String)
+POST   /api/instance/*id                                        controllers.NexusEditorController.updateInstance(id: String)
+POST   /api/schema/:organization/:domain/:entityType/:version   controllers.NexusCommonController.createSchema(organization: String, domain: String, entityType: String, version: String)
 
-GET    /api/reconciled/:id              controllers.NexusEditorController.getSpecificReconciledInstance(id: String ,rev:Int ?= 1)
+GET    /api/reconciled/:id                                      controllers.NexusEditorController.getSpecificReconciledInstance(id: String ,rev:Int ?= 1)
 
 
 # Map static resources from the /public folder to the /assets URL path
-GET     /assets/*file                   controllers.Assets.versioned(path="/public", file: Asset)
+GET     /assets/*file                                           controllers.Assets.versioned(path="/public", file: Asset)
 
 # Extract data from a dataworkbench templated excel file
-POST    /api/dataworkbench/extractDataFromExcel           controllers.ExcelImportController.extractDataFromExcel(action: Option[String])
+POST    /api/dataworkbench/extractDataFromExcel                 controllers.ExcelImportController.extractDataFromExcel(action: Option[String])
 
 
 # Auth
 
 
-GET     /auth/groups                         controllers.OIDCController.groups
-OPTIONS /auth/groups                         controllers.OIDCController.groupsOptions
+GET     /auth/groups                                            controllers.OIDCController.groups
+OPTIONS /auth/groups                                            controllers.OIDCController.groupsOptions
 
 
 # Monitoring
 
-GET     /metrics                        com.github.stijndehaes.playprometheusfilters.controllers.PrometheusController.getMetrics
+GET     /metrics                                                com.github.stijndehaes.playprometheusfilters.controllers.PrometheusController.getMetrics

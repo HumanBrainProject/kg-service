@@ -146,7 +146,6 @@ object InstanceHelper {
             Left(res)
         }
     }
-
   }
 
   def buildDiffEntity(consolidatedResponse: Instance, newValue: String, originalInstance: Instance): JsObject = {
