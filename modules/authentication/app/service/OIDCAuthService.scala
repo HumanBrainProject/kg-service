@@ -37,6 +37,10 @@ class OIDCAuthService @Inject() (config: Configuration)(implicit ec: ExecutionCo
 
   override def getUserInfo(headers: Headers): Future[Option[UserInfo]] = {
     val token = headers.get("Authorization").getOrElse("")
+    getUserInfoFromToken(token)
+  }
+
+  def getUserInfoFromToken(token:String): Future[Option[UserInfo]] = {
     ws.url(oidcUserInfoEndpoint).addHttpHeaders("Authorization" -> token).get().map {
       res =>
         res.status match {

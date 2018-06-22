@@ -18,15 +18,18 @@ lazy val nexus = (project in file("modules/nexus"))
   .enablePlugins(PlayScala)
   .dependsOn(common)
 
+lazy val proxy = (project in file("modules/proxy"))
+  .enablePlugins(PlayScala)
+  .dependsOn(common, auth)
+
 lazy val editor = (project in file("modules/editor"))
   .enablePlugins(PlayScala)
   .dependsOn(common, auth, nexus)
 
-
 lazy val kg_service = (project in file("."))
   .enablePlugins(PlayScala)
-  .aggregate(common, auth, editor, data_import, nexus)
-  .dependsOn(common, auth, editor, data_import, nexus)
+  .aggregate(common, auth, editor, data_import, nexus, proxy)
+  .dependsOn(common, auth, editor, data_import, nexus, proxy)
 
 Common.settings
 

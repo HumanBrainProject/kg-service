@@ -19,18 +19,16 @@ package models.authentication
 
 import play.api.libs.json.JsObject
 
-case class UserInfo(json: JsObject) {
-
-  import UserInfo._
-
-  val id = (json \ idLabel).asOpt[String].getOrElse("")
-  val name = (json \ nameLabel).asOpt[String].getOrElse("")
-  val email = (json \ emailLabel).asOpt[String].getOrElse("")
-  val groups = (json \ groupsLabel).asOpt[String].getOrElse("").split(",").toSeq
-
-}
-
+case class UserInfo(id: String, name:String, email:String, groups:Seq[String])
 object UserInfo {
+  def apply(json: JsObject) = {
+    new UserInfo(
+      id = (json \ idLabel).asOpt[String].getOrElse(""),
+      name = (json \ nameLabel).asOpt[String].getOrElse(""),
+      email = (json \ emailLabel).asOpt[String].getOrElse(""),
+      groups = (json \ groupsLabel).asOpt[String].getOrElse("").split(",").toSeq
+    )
+  }
   val idLabel = "sub"
   val nameLabel = "name"
   val emailLabel = "email"
