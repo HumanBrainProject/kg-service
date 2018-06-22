@@ -18,7 +18,6 @@
 package controllers.authentication
 
 import com.google.inject.Inject
-import common.core.ConfigurationHandler
 import javax.inject.Singleton
 import models.authentication.{AuthenticatedUserAction, UserRequest}
 import play.api.libs.json.Json
@@ -32,10 +31,12 @@ import scala.concurrent.ExecutionContext
 @Singleton
 class OIDCController @Inject()(cc: ControllerComponents,
                                authService: OIDCAuthService,
-                               authenticatedUserAction: AuthenticatedUserAction)
+                               authenticatedUserAction: AuthenticatedUserAction,
+                               config: Configuration
+                              )
                               (implicit ec: ExecutionContext, ws: WSClient)
   extends AbstractController(cc) {
-  val esHost: String = ConfigurationHandler.getString("es.host")
+  val esHost: String = config.get[String]("es.host")
   val logger = Logger(this.getClass)
 
   def groups(): Action[AnyContent] = authenticatedUserAction.async { implicit request: UserRequest[AnyContent] =>

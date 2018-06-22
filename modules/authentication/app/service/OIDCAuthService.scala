@@ -18,10 +18,9 @@
 package service.authentication
 
 import com.google.inject.Inject
-import common.core.ConfigurationHandler
 import common.helpers.ESHelper
 import models.authentication.UserInfo
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.http.Status._
 import play.api.libs.json.JsObject
 import play.api.libs.ws.WSClient
@@ -29,9 +28,9 @@ import play.api.mvc.Headers
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class OIDCAuthService @Inject() (implicit ec: ExecutionContext,  ws: WSClient) extends AuthService {
-  val oidcUserInfoEndpoint = ConfigurationHandler.getString("auth.userinfo")
-  val esHost: String = ConfigurationHandler.getString("es.host")
+class OIDCAuthService @Inject() (config: Configuration)(implicit ec: ExecutionContext,  ws: WSClient) extends AuthService {
+  val oidcUserInfoEndpoint = config.get[String]("auth.userinfo")
+  val esHost: String = config.get[String]("es.host")
   val logger = Logger(this.getClass)
 
   override type U = Option[UserInfo]

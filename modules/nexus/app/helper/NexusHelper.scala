@@ -17,7 +17,6 @@
 
 package nexus.helpers
 
-import common.core.ConfigurationHandler
 import play.api.http.Status._
 import play.api.libs.json._
 import play.api.libs.ws.{WSClient, WSResponse}
@@ -80,9 +79,8 @@ object NexusHelper {
     )
   }
 
-  def createSchema(org: String, entityType: String, space: String, version: String, token: String)(implicit ws: WSClient, ec: ExecutionContext): Future[WSResponse] = {
+  def createSchema(nexusUrl:String, org: String, entityType: String, space: String, version: String, token: String)(implicit ws: WSClient, ec: ExecutionContext): Future[WSResponse] = {
 
-    val nexusUrl = ConfigurationHandler.getString(s"nexus.endpoint")
     val schemaUrl = s"${nexusUrl}/v0/schemas/${space}/${entityType.toLowerCase}/${version}"
     ws.url(schemaUrl).addHttpHeaders("Authorization" -> token).get().flatMap{
       response => response.status match {
@@ -106,9 +104,8 @@ object NexusHelper {
     }
   }
 
-  def createDomain(org: String, domain: String, domainDescription: String, token: String)(implicit ws: WSClient, ec: ExecutionContext): Future[WSResponse] = {
+  def createDomain(nexusUrl:String, org: String, domain: String, domainDescription: String, token: String)(implicit ws: WSClient, ec: ExecutionContext): Future[WSResponse] = {
     assert(domain.forall(_.isLetterOrDigit))
-    val nexusUrl = ConfigurationHandler.getString(s"nexus.endpoint")
     val schemaUrl = s"${nexusUrl}/v0/domains/$org/${domain.toLowerCase}/"
     ws.url(schemaUrl).addHttpHeaders("Authorization" -> token).get().flatMap{
       response => response.status match {

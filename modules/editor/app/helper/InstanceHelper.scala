@@ -18,7 +18,6 @@
 package editor.helper
 
 
-import common.core.ConfigurationHandler
 import common.helpers.JsFlattener
 import common.models.NexusPath
 import editor.models.{InMemoryKnowledge, Instance}
@@ -38,17 +37,9 @@ import scala.collection.immutable.SortedSet
 import scala.concurrent.{ExecutionContext, Future}
 
 object InstanceHelper {
+    val logger = Logger(this.getClass)
 
-  val blazegraphNameSpace = ConfigurationHandler.getOptionalString("blazegraph.namespace").getOrElse("kg")
-  val nexusEndpoint = ConfigurationHandler.getOptionalString("nexus.endpoint").getOrElse("https://nexus-dev.humanbrainproject.org")
-  val reconcileEndpoint = ConfigurationHandler.getOptionalString("reconcile.endpoint").getOrElse("https://nexus-admin-dev.humanbrainproject.org/reconcile")
-  val reconciledSpace = ConfigurationHandler.getOptionalString("nexus.reconciledspace").getOrElse("reconciled/poc")
-  val manualSpace = ConfigurationHandler.getOptionalString("nexus.manualspace").getOrElse("manual/poc")
-  val sparqlEndpoint = ConfigurationHandler.getOptionalString("blazegraph.endpoint").getOrElse("http://localhost:9999")
-  val oidcUserInfoEndpoint = ConfigurationHandler.getString("auth.userinfo")
-  val logger = Logger(this.getClass)
-
-  def retrieveIncomingLinks(originalInstance: Instance,
+  def retrieveIncomingLinks(nexusEndpoint:String, originalInstance: Instance,
                             token: String)(implicit ws: WSClient, ec: ExecutionContext): Future[IndexedSeq[Instance]] = {
     val filter =
       """
@@ -71,9 +62,9 @@ object InstanceHelper {
   }
 
 
-  def generateReconciledInstance(reconciledInstance: Instance, manualUpdates: IndexedSeq[Instance], manualEntityToBestored: JsObject, userInfo: UserInfo, parentRevision: Int, parentId: String, token: String): JsObject = {
+  def generateReconciledInstance(manualSpace: String, reconciledInstance: Instance, manualUpdates: IndexedSeq[Instance], manualEntityToBestored: JsObject, userInfo: UserInfo, parentRevision: Int, parentId: String, token: String): JsObject = {
 
-    val recInstanceWithParents = addManualUpdateLinksToReconcileInstance(reconciledInstance, manualUpdates, manualEntityToBestored)
+    val recInstanceWithParents = addManualUpdateLinksToReconcileInstance(manualSpace, reconciledInstance, manualUpdates, manualEntityToBestored)
     val cleanUpObject = cleanUpInstanceForSave(recInstanceWithParents).+("@type" -> JsString(s"http://hbp.eu/reconciled#${reconciledInstance.nexusPath.schema.capitalize}"))
     cleanUpObject +
       ("http://hbp.eu/reconciled#updater_id", JsString(userInfo.id)) +
@@ -83,15 +74,15 @@ object InstanceHelper {
       ("http://hbp.eu/reconciled#update_timestamp", JsNumber(new DateTime().getMillis))
   }
 
-  def createReconcileInstance(instance: JsObject, schema: String, version: String, token: String)(implicit ws: WSClient): Future[WSResponse] = {
+  def createReconcileInstance(nexusEndpoint:String,reconciledSpace: String, instance: JsObject, schema: String, version: String, token: String)(implicit ws: WSClient): Future[WSResponse] = {
     ws.url(s"$nexusEndpoint/v0/data/$reconciledSpace/${schema}/${version}").withHttpHeaders("Authorization" -> token).post(instance)
   }
 
-  def updateReconcileInstance(instance: JsObject, nexusPath: NexusPath, id: String, revision: Int, token: String)(implicit ws: WSClient): Future[WSResponse] = {
+  def updateReconcileInstance(nexusEndpoint:String,reconciledSpace:String, instance: JsObject, nexusPath: NexusPath, id: String, revision: Int, token: String)(implicit ws: WSClient): Future[WSResponse] = {
     ws.url(s"$nexusEndpoint/v0/data/$reconciledSpace/${nexusPath.schema}/${nexusPath.version}/$id?rev=${revision}").withHttpHeaders("Authorization" -> token).put(instance)
   }
 
-  def addManualUpdateLinksToReconcileInstance(reconciledInstance: Instance, incomingLinks: IndexedSeq[Instance], manualEntityToBeStored: JsObject): Instance = {
+  def addManualUpdateLinksToReconcileInstance(manualSpace:String, reconciledInstance: Instance, incomingLinks: IndexedSeq[Instance], manualEntityToBeStored: JsObject): Instance = {
     val manualUpdates: IndexedSeq[Instance] = incomingLinks.filter(instance => instance.nexusPath.toString() contains manualSpace)
     val currentParent = (reconciledInstance.content \ "http://hbp.eu/reconciled#parents").asOpt[List[JsValue]].getOrElse(List[JsValue]())
     val updatedParents: List[JsValue] = manualUpdates.foldLeft(currentParent) { (acc, manual) =>
@@ -114,6 +105,7 @@ object InstanceHelper {
   type UpdateInfo = (String, Int, String)
 
   def consolidateFromManualSpace(
+                                  manualSpace:String,
                                   originalInstance: Instance,
                                   incomingLinks: IndexedSeq[Instance],
                                   updateToBeStoredInManual: JsObject
@@ -135,7 +127,7 @@ object InstanceHelper {
     }
   }
 
-  def retrieveOriginalInstance(id: String, token: String)(implicit ws: WSClient, ec: ExecutionContext): Future[Either[WSResponse, Instance]] = {
+  def retrieveOriginalInstance(nexusEndpoint:String, id: String, token: String)(implicit ws: WSClient, ec: ExecutionContext): Future[Either[WSResponse, Instance]] = {
     ws.url(s"$nexusEndpoint/v0/data/$id?fields=all").addHttpHeaders("Authorization" -> token).get().map {
       res =>
         res.status match {
@@ -187,31 +179,43 @@ object InstanceHelper {
     request.headers.toMap.getOrElse("Authorization", Seq("")).head
   }
 
-  def upsertReconciledInstance(instances: IndexedSeq[Instance], originalInstance: Instance,
-                               manualEntity: JsObject, updatedValue: JsObject,
-                               consolidatedInstance: Instance, token: String,
-                               userInfo: UserInfo,
-                               inMemoryReconciledSpaceSchemas: InMemoryKnowledge)(implicit ws: WSClient, ec: ExecutionContext): Future[WSResponse] = {
+  def upsertReconciledInstance(
+                                nexusEndpoint: String,
+                                reconciledSpace:String,
+                                manualSpace: String,
+                                instances: IndexedSeq[Instance], originalInstance: Instance,
+                                manualEntity: JsObject, updatedValue: JsObject,
+                                consolidatedInstance: Instance, token: String,
+                                userInfo: UserInfo,
+                                inMemoryReconciledSpaceSchemas: InMemoryKnowledge
+                              )(implicit ws: WSClient, ec: ExecutionContext): Future[WSResponse] = {
 
     val reconcileInstances = instances.filter(instance => instance.nexusPath.toString() contains reconciledSpace)
     val parentId = (originalInstance.content \ "@id").as[String]
     if (reconcileInstances.nonEmpty) {
       val reconcileInstance = reconcileInstances.head
       val parentRevision = (reconcileInstance.content \ "nxv:rev").as[Int]
-      val payload = generateReconciledInstance(Instance(updatedValue), instances, manualEntity, userInfo, parentRevision, parentId, token)
-      updateReconcileInstance(payload, reconcileInstance.nexusPath, reconcileInstance.nexusUUID, parentRevision, token)
+      val payload = generateReconciledInstance(manualSpace, Instance(updatedValue), instances, manualEntity, userInfo, parentRevision, parentId, token)
+      updateReconcileInstance(nexusEndpoint, reconciledSpace, payload, reconcileInstance.nexusPath, reconcileInstance.nexusUUID, parentRevision, token)
     } else {
       val parentRevision = (originalInstance.content \ "nxv:rev").as[Int]
-      val payload = generateReconciledInstance(consolidatedInstance, instances, manualEntity, userInfo, parentRevision, parentId, token)
-      createManualSchemaIfNeeded(updatedValue, originalInstance, token, inMemoryReconciledSpaceSchemas, reconciledSpace, "reconciled").flatMap {
+      val payload = generateReconciledInstance(manualSpace, consolidatedInstance, instances, manualEntity, userInfo, parentRevision, parentId, token)
+      createManualSchemaIfNeeded(nexusEndpoint, updatedValue, originalInstance, token, inMemoryReconciledSpaceSchemas, reconciledSpace, "reconciled").flatMap {
         res =>
-          createReconcileInstance(payload, consolidatedInstance.nexusPath.schema, consolidatedInstance.nexusPath.version, token)
+          createReconcileInstance(nexusEndpoint, reconciledSpace, payload, consolidatedInstance.nexusPath.schema, consolidatedInstance.nexusPath.version, token)
       }
     }
   }
 
-  def createManualSchemaIfNeeded(manualEntity: JsObject, originalInstance: Instance, token: String, schemasHashMap: InMemoryKnowledge,
-                                 space: String, destinationOrg: String)
+  def createManualSchemaIfNeeded(
+                                  nexusEndpoint:String,
+                                  manualEntity: JsObject,
+                                  originalInstance: Instance,
+                                  token: String,
+                                  schemasHashMap: InMemoryKnowledge,
+                                 space: String,
+                                  destinationOrg: String
+                                )
                                 (implicit ws: WSClient, ec: ExecutionContext): Future[Boolean] = {
     // ensure schema related to manual update exists or create it
     if (manualEntity != JsNull) {
@@ -219,7 +223,7 @@ object InstanceHelper {
         schemasHashMap.loadManualSchemaList(token)
       }
       if (!schemasHashMap.manualSchema.contains(s"$nexusEndpoint/v0/schemas/$space/${originalInstance.nexusPath.schema}/${originalInstance.nexusPath.version}")) {
-        NexusHelper.createSchema(destinationOrg, originalInstance.nexusPath.schema.capitalize, space, originalInstance.nexusPath.version, token).map {
+        NexusHelper.createSchema(nexusEndpoint, destinationOrg, originalInstance.nexusPath.schema.capitalize, space, originalInstance.nexusPath.version, token).map {
           response =>
             response.status match {
               case OK => schemasHashMap.loadManualSchemaList(token)
@@ -237,7 +241,15 @@ object InstanceHelper {
     Future.successful(true)
   }
 
-  def upsertUpdateInManualSpace(manualEntitiesDetailsOpt: Option[IndexedSeq[UpdateInfo]], userInfo: UserInfo, schema: String, manualEntity: JsObject, token: String)
+  def upsertUpdateInManualSpace(
+                                 nexusEndpoint:String,
+                                 manualSpace: String,
+                                 manualEntitiesDetailsOpt: Option[IndexedSeq[UpdateInfo]],
+                                 userInfo: UserInfo,
+                                 schema: String,
+                                 manualEntity: JsObject,
+                                 token: String
+                               )
                                (implicit ws: WSClient): Future[WSResponse] = {
     manualEntitiesDetailsOpt.flatMap { manualEntitiesDetails =>
       // find manual entry corresponding to the user
@@ -251,14 +263,6 @@ object InstanceHelper {
       ws.url(s"$nexusEndpoint/v0/data/$manualSpace/${schema}/v0.0.4").addHttpHeaders("Authorization" -> token).post(
         manualEntity + ("http://hbp.eu/manual#updater_id", JsString(userInfo.id))
       )
-    }
-  }
-
-
-  def getUserInfo(token: String)(implicit ws: WSClient, ec: ExecutionContext): Future[UserInfo] = {
-    ws.url(oidcUserInfoEndpoint).addHttpHeaders("Authorization" -> token).get().map {
-      res =>
-        UserInfo(res.json.as[JsObject])
     }
   }
 

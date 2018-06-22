@@ -1,4 +1,4 @@
-package nexus.editor.helpers
+package editor.helpers
 
 import play.api.inject.guice.GuiceApplicationBuilder
 

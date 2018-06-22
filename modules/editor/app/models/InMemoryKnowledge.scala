@@ -18,7 +18,6 @@
 package editor.models
 
 
-import common.core.ConfigurationHandler
 import nexus.helpers.NexusHelper
 import play.api.Configuration
 import play.api.libs.json.JsObject
@@ -28,15 +27,16 @@ import concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext}
 import scala.collection.immutable.HashSet
 
-class InMemoryKnowledge(space: String) {
+class InMemoryKnowledge(endpoint: String, space: String) {
 
   // stores known schemas available in manual space
   var manualSchema = HashSet.empty[String]
+  val nexusEndpoint = endpoint
 
 
   // This must be called by controller whenever it's needed to refresh known schema list
   def loadManualSchemaList(token: String)(implicit ws: WSClient, ec: ExecutionContext) = {
-    val schemaUrl = s"${ConfigurationHandler.getString("nexus.endpoint")}/v0/schemas/$space"
+    val schemaUrl = s"$nexusEndpoint/v0/schemas/$space"
     // wait for schemas call to finish before going on
     val currentSchemas =Await.result(
       NexusHelper.listAllNexusResult(schemaUrl, token),

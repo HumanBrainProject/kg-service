@@ -17,7 +17,6 @@
 
 package editor.controllers
 
-import common.core.ConfigurationHandler
 import common.helpers.BlazegraphHelper
 import common.helpers.ResponseHelper._
 import editor.helper.InstanceHelper._
@@ -25,9 +24,9 @@ import common.models.NexusPath
 import editor.helper.InstanceHelper
 import editor.helpers.{FormHelper, NodeTypeHelper}
 import editor.models.{InMemoryKnowledge, Instance}
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import models.authentication.AuthenticatedUserAction
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.http.HttpEntity
 import play.api.http.Status.OK
 import play.api.libs.json.Reads._
@@ -37,17 +36,20 @@ import play.api.mvc._
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class NexusEditorController @Inject()(cc: ControllerComponents, authenticatedUserAction: AuthenticatedUserAction)(implicit ec: ExecutionContext, ws: WSClient)
+@Singleton
+class NexusEditorController @Inject()(cc: ControllerComponents, authenticatedUserAction: AuthenticatedUserAction, config: Configuration)(implicit ec: ExecutionContext, ws: WSClient)
   extends AbstractController(cc) {
-  val blazegraphNameSpace = ConfigurationHandler.getOptionalString("blazegraph.namespace").getOrElse("kg")
-  val nexusEndpoint = ConfigurationHandler.getOptionalString("nexus.endpoint").getOrElse("https://nexus-dev.humanbrainproject.org")
-  val reconcileEndpoint = ConfigurationHandler.getOptionalString("reconcile.endpoint").getOrElse("https://nexus-admin-dev.humanbrainproject.org/reconcile")
-  val reconciledSpace = ConfigurationHandler.getOptionalString("nexus.reconciledspace").getOrElse("reconciled/poc")
-  val manualSpace = ConfigurationHandler.getOptionalString("nexus.manualspace").getOrElse("manual/poc")
-  val sparqlEndpoint = ConfigurationHandler.getOptionalString("blazegraph.endpoint").getOrElse("http://localhost:9999")
-  val oidcUserInfoEndpoint = ConfigurationHandler.getString("auth.userinfo")
-  val inMemoryManualSpaceSchemas = new InMemoryKnowledge(manualSpace)
-  val inMemoryReconciledSpaceSchemas = new InMemoryKnowledge(reconciledSpace)
+
+  val blazegraphNameSpace = config.getOptional[String]("blazegraph.namespace").getOrElse("kg")
+  val nexusEndpoint = config.getOptional[String]("nexus.endpoint").getOrElse("https://nexus-dev.humanbrainproject.org")
+  val reconcileEndpoint = config.getOptional[String]("reconcile.endpoint").getOrElse("https://nexus-admin-dev.humanbrainproject.org/reconcile")
+  val reconciledSpace = config.getOptional[String]("nexus.reconciledspace").getOrElse("reconciled/poc")
+  val manualSpace = config.getOptional[String]("nexus.manualspace").getOrElse("manual/poc")
+  val sparqlEndpoint = config.getOptional[String]("blazegraph.endpoint").getOrElse("http://localhost:9999")
+  val oidcUserInfoEndpoint = config.get[String]("auth.userinfo")
+  val inMemoryManualSpaceSchemas = new InMemoryKnowledge(nexusEndpoint, manualSpace)
+  val inMemoryReconciledSpaceSchemas = new InMemoryKnowledge(nexusEndpoint, reconciledSpace)
+
 
   val logger = Logger(this.getClass)
 
@@ -107,11 +109,11 @@ class NexusEditorController @Inject()(cc: ControllerComponents, authenticatedUse
   def getInstance(id: String): Action[AnyContent] = Action.async { implicit request =>
     val token = request.headers.get("Authorization").getOrElse("")
     val nexusPath = NexusPath(id.split("/").toList)
-    InstanceHelper.retrieveOriginalInstance(id, token).flatMap[Result] {
+    InstanceHelper.retrieveOriginalInstance(nexusEndpoint, id, token).flatMap[Result] {
       case Left(res) => Future.successful(Result(ResponseHeader(res.status, flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](res.headers))),
         HttpEntity.Strict(res.bodyAsBytes, getContentType(res.headers))))
       case Right(originalInstance) =>
-        InstanceHelper.retrieveIncomingLinks(originalInstance, token).map {
+        InstanceHelper.retrieveIncomingLinks(nexusEndpoint, originalInstance, token).map {
           instances =>
             val reconcileInstances = instances.filter(instance => instance.nexusPath.toString() contains s"$reconciledSpace/${nexusPath.schema}/${nexusPath.version}")
             if (reconcileInstances.nonEmpty) {
@@ -134,7 +136,7 @@ class NexusEditorController @Inject()(cc: ControllerComponents, authenticatedUse
 
   def getInstanceNumberOfAvailableRevisions(id: String): Action[AnyContent] = Action.async { implicit request =>
     val token = request.headers.get("Authorization").getOrElse("")
-    InstanceHelper.retrieveOriginalInstance(id, token).flatMap[Result] {
+    InstanceHelper.retrieveOriginalInstance(nexusEndpoint, id, token).flatMap[Result] {
       case Left(res) => Future.successful(Result(ResponseHeader(res.status, flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](res.headers))),
         HttpEntity.Strict(res.bodyAsBytes, getContentType(res.headers))))
       case Right(originalInstance) =>
@@ -180,11 +182,11 @@ class NexusEditorController @Inject()(cc: ControllerComponents, authenticatedUse
     //    val orgContentFuture = retrieve(id, request.headers) // call core of get id
     if(request.user.isDefined){
       val newValue = request.body.asJson.get
-      retrieveOriginalInstance(id, token).flatMap[Result] {
+      retrieveOriginalInstance(nexusEndpoint, id, token).flatMap[Result] {
         case Left(res) => Future.successful(Result(ResponseHeader(res.status, flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](res.headers))),
           HttpEntity.Strict(res.bodyAsBytes, getContentType(res.headers))))
         case Right(originalInstance) =>
-          retrieveIncomingLinks(originalInstance, token).flatMap[Result] {
+          retrieveIncomingLinks(nexusEndpoint, originalInstance, token).flatMap[Result] {
             incomingLinks =>
               val currentReconciledInstances = incomingLinks.filter(instance => instance.nexusPath.toString() contains reconciledSpace)
               val currentInstanceDisplayed = InstanceHelper.getCurrentInstanceDisplayed(currentReconciledInstances, originalInstance)
@@ -194,14 +196,14 @@ class NexusEditorController @Inject()(cc: ControllerComponents, authenticatedUse
               val updatedInstance = buildInstanceFromForm(originalInstance.content, updateFromUI)
               val userInfo = request.user.get
               val updateToBeStoredInManual = buildDiffEntity(currentInstanceDisplayed, updatedInstance.toString, originalInstance) + ("@type", JsString(s"http://hbp.eu/manual#${originalInstance.nexusPath.schema.capitalize}"))
-              consolidateFromManualSpace(originalInstance, incomingLinks, updateToBeStoredInManual) match {
+              consolidateFromManualSpace(manualSpace, originalInstance, incomingLinks, updateToBeStoredInManual) match {
                 case (consolidatedInstance, manualEntitiesDetailsOpt) =>
                   logger.debug(s"Consolidated instance $updatedInstance")
                   val re: Future[Result] = for {
-                    createdSchemas <- createManualSchemaIfNeeded(updateToBeStoredInManual, originalInstance, token, inMemoryManualSpaceSchemas, manualSpace, "manual")
+                    createdSchemas <- createManualSchemaIfNeeded(nexusEndpoint, updateToBeStoredInManual, originalInstance, token, inMemoryManualSpaceSchemas, manualSpace, "manual")
                     preppedEntityForStorage = InstanceHelper.prepareManualEntityForStorage(updateToBeStoredInManual, userInfo)
-                    createdInManualSpace <- upsertUpdateInManualSpace(manualEntitiesDetailsOpt, userInfo, originalInstance.nexusPath.schema, preppedEntityForStorage, token)
-                    createReconciledInstance <- upsertReconciledInstance(incomingLinks, originalInstance, preppedEntityForStorage, updatedInstance, consolidatedInstance, token, userInfo, inMemoryManualSpaceSchemas)
+                    createdInManualSpace <- upsertUpdateInManualSpace(nexusEndpoint, manualSpace, manualEntitiesDetailsOpt, userInfo, originalInstance.nexusPath.schema, preppedEntityForStorage, token)
+                    createReconciledInstance <- upsertReconciledInstance(nexusEndpoint, reconciledSpace, manualSpace, incomingLinks, originalInstance, preppedEntityForStorage, updatedInstance, consolidatedInstance, token, userInfo, inMemoryManualSpaceSchemas)
                   } yield {
                     logger.debug(s"Result from reconciled upsert: ${createReconciledInstance.status}")
                     logger.debug(createReconciledInstance.body)

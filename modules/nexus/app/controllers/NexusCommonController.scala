@@ -17,11 +17,10 @@
 
 package nexus.controllers
 
-import common.core.ConfigurationHandler
 import common.helpers.ResponseHelper._
 import javax.inject.{Inject, Singleton}
 import nexus.helpers.{NexusHelper, NexusSpaceHandler}
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.http.HttpEntity
 import play.api.libs.ws.WSClient
 import play.api.mvc._
@@ -29,12 +28,12 @@ import play.api.mvc._
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class NexusCommonController @Inject()(cc: ControllerComponents)(implicit ec: ExecutionContext, ws: WSClient)
+class NexusCommonController @Inject()(cc: ControllerComponents, config:Configuration)(implicit ec: ExecutionContext, ws: WSClient)
   extends AbstractController(cc) {
   val logger = Logger(this.getClass)
-  val apiEndpoint = ConfigurationHandler.getString("idm.api")
-  val nexusEndpoint = ConfigurationHandler.getString("nexus.endpoint")
-  val iamEndpoint = ConfigurationHandler.getString("nexus.iam")
+  val apiEndpoint = config.get[String]("idm.api")
+  val nexusEndpoint = config.get[String]("nexus.endpoint")
+  val iamEndpoint = config.get[String]("nexus.iam")
   val orgNamePattern = "[a-z0-9]{3,}"
 
   def createPrivateSpace(): Action[AnyContent] = Action.async { implicit request =>
@@ -73,7 +72,7 @@ class NexusCommonController @Inject()(cc: ControllerComponents)(implicit ec: Exe
     val tokenOpt = request.headers.toSimpleMap.get("Authorization")
     tokenOpt match {
       case Some(token) =>
-        NexusHelper.createSchema(organization, entityType, s"$organization/$domain", version, token).map {
+        NexusHelper.createSchema(nexusEndpoint, organization, entityType, s"$organization/$domain", version, token).map {
             response =>
               response.status match {
                 case 200 =>
