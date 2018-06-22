@@ -5,33 +5,22 @@
 
 #Private Space Creation
 
-POST    /privatespace                   controllers.NexusCommonController.createPrivateSpace()
-
+-> /nexus nexus.Routes
 
 #KG Editor routes
 
-GET    /api/nodetypes                  controllers.NexusEditorController.listEntities( privateSpace: String ?= "minds")
-GET    /api/instances/*nodetype         controllers.NexusEditorController.listInstances(nodetype: String)
-GET    /api/instance/*id                 controllers.NexusEditorController.getInstance(id: String)
-POST   /api/instance/*id                 controllers.NexusEditorController.updateInstance(id: String)
-POST   /api/schema/:organization/:domain/:entityType/:version  controllers.NexusCommonController.createSchema(organization: String, domain: String, entityType: String, version: String)
-
-GET    /api/reconciled/:id              controllers.NexusEditorController.getSpecificReconciledInstance(id: String ,rev:Int ?= 1)
-
+-> /editor editor.Routes
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file                   controllers.Assets.versioned(path="/public", file: Asset)
 
 # Extract data from a dataworkbench templated excel file
-POST    /api/dataworkbench/extractDataFromExcel           controllers.ExcelImportController.extractDataFromExcel(action: Option[String])
 
+-> /dataimport data_import.Routes
 
 # Auth
 
-
-GET     /auth/groups                         controllers.OIDCController.groups
-OPTIONS /auth/groups                         controllers.OIDCController.groupsOptions
-
+-> /auth auth.Routes
 
 # Monitoring
 
