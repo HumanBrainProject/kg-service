@@ -132,6 +132,20 @@ class NexusEditorController @Inject()(cc: ControllerComponents, authenticatedUse
     }
   }
 
+  def getInstanceNumberOfAvailableRevisions(id: String): Action[AnyContent] = Action.async { implicit request =>
+    val token = request.headers.get("Authorization").getOrElse("")
+    InstanceHelper.retrieveOriginalInstance(id, token).flatMap[Result] {
+      case Left(res) => Future.successful(Result(ResponseHeader(res.status, flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](res.headers))),
+        HttpEntity.Strict(res.bodyAsBytes, getContentType(res.headers))))
+      case Right(originalInstance) =>
+        val nbRevision = (originalInstance.content \ "nxv:rev").as[JsNumber]
+        Future.successful(Ok(
+          Json.obj("available_revisions" -> nbRevision,
+                    "path" -> id))
+        )
+    }
+  }
+
   def getSpecificReconciledInstance(id:String, revision:Int): Action[AnyContent] = Action.async { implicit request =>
     val token = request.headers.get("Authorization").getOrElse("")
     val nexusPath = NexusPath(id.split("/").toList)
