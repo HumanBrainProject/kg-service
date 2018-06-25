@@ -25,12 +25,12 @@ import play.api.http.Status._
 import play.api.libs.json.JsObject
 import play.api.libs.ws.WSClient
 import play.api.mvc.Headers
+import services.ESService
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class OIDCAuthService @Inject() (config: Configuration)(implicit ec: ExecutionContext,  ws: WSClient) extends AuthService {
+class OIDCAuthService @Inject()(config: Configuration, eSService: ESService)(implicit ec: ExecutionContext, ws: WSClient) extends AuthService {
   val oidcUserInfoEndpoint = config.get[String]("auth.userinfo")
-  val esHost: String = config.get[String]("es.host")
   val logger = Logger(this.getClass)
 
   override type U = Option[UserInfo]
@@ -55,7 +55,7 @@ class OIDCAuthService @Inject() (config: Configuration)(implicit ec: ExecutionCo
     userInfo match {
       case Some(info) =>
         for {
-          esIndices <- ESHelper.getEsIndices(esHost)
+          esIndices <- eSService.getEsIndices()
         } yield {
           val kgIndices = esIndices.filter(_.startsWith("kg_")).map(_.substring(3))
           val nexusGroups =  info.groups

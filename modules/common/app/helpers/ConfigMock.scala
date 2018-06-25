@@ -1,4 +1,4 @@
-package editor.helpers
+package common.helpers
 
 import play.api.inject.guice.GuiceApplicationBuilder
 

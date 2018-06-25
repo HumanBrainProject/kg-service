@@ -40,14 +40,4 @@ object ESHelper {
     s"kg_$s"
   }
 
-  def getEsIndices(esEndpoint:String)(implicit wSClient: WSClient ,executionContext: ExecutionContext) : Future[List[String]] = {
-    wSClient.url(esEndpoint + s"/${ESHelper.indicesPath}?format=json").get().map{ res =>
-      val j = res.json
-      j.as[List[JsValue]].map( json =>
-        (json \ "index").as[String]
-      )
-    }
-  }
-
-
 }

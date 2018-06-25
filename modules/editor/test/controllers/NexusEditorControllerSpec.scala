@@ -15,6 +15,8 @@
 */
 package editor.controllers
 
+import common.helpers.ConfigMock
+import common.helpers.ConfigMock._
 import common.models.NexusPath
 import editor.helper.InstanceHelper
 import editor.models.Instance
@@ -33,9 +35,8 @@ import play.api.mvc._
 
 class NexusEditorControllerSpec extends PlaySpec with GuiceOneAppPerSuite with MockWSHelpers with MockitoSugar with Injecting {
 
-  import editor.helpers.ConfigMock._
 
-  override def fakeApplication(): Application = fakeApplicationConfig.build()
+  override def fakeApplication(): Application = ConfigMock.fakeApplicationConfig.build()
 
   "Retrieve from manual" should {
     "build the frequency of fields in manual" in {
