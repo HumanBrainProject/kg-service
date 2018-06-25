@@ -18,8 +18,10 @@
 import com.github.stijndehaes.playprometheusfilters.filters.{LatencyFilter, StatusCounterFilter}
 import com.google.inject.Inject
 import play.api.http.DefaultHttpFilters
+import play.filters.gzip.GzipFilter
 
 class Filters @Inject()(
    latencyFilter: LatencyFilter,
    statusCounterFilter: StatusCounterFilter,
- ) extends DefaultHttpFilters(latencyFilter, statusCounterFilter)
+   gzipFilter:GzipFilter
+ ) extends DefaultHttpFilters(latencyFilter, statusCounterFilter, gzipFilter)

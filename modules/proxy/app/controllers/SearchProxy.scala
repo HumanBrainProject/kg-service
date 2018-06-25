@@ -2,7 +2,7 @@ package proxy.controllers
 
 import akka.stream.Materializer
 import akka.util.ByteString
-import common.helpers.ESHelper
+import common.helpers.{ResponseHelper, ESHelper}
 import play.api.cache.{AsyncCacheApi, NamedCache}
 import play.api.{Configuration, Logger}
 import javax.inject.{Inject, Singleton}
@@ -56,7 +56,7 @@ class SearchProxy @Inject()(
     }
   }
 
-  def smartProxy(index: String, proxyUrl: String): Action[RawBuffer] = Action.async(playBodyParsers.raw) { implicit request =>
+  def proxySearch(index: String, proxyUrl: String): Action[RawBuffer] = Action.async(playBodyParsers.raw) { implicit request =>
     logger.debug(s"smartproxy query - Index: $index, proxy: $proxyUrl")
     updateEsResponseWithNestedDocument(
       processRequest(index, proxyUrl, transformInputFunc = SearchProxy.adaptEsQueryForNestedDocument))
@@ -135,38 +135,9 @@ object SearchProxy {
       .map { case (response: request.Response) => // we want to read the raw bytes for the body
       Result(
         // keep original response header except content type and length that need specific handling
-        ResponseHeader(response.status, flattenHeaders(filterContentTypeAndLengthFromHeaders[Seq[String]](response.headers)) ++ headers),
-        HttpEntity.Strict(response.bodyAsBytes, getContentType(response.headers))
+        ResponseHeader(response.status, ResponseHelper.flattenHeaders(ResponseHelper.filterContentTypeAndLengthFromHeaders[Seq[String]](response.headers)) ++ headers),
+        HttpEntity.Strict(response.bodyAsBytes, ResponseHelper.getContentType(response.headers))
       )
-    }
-  }
-
-  def getContentType(headers: Map[String, Seq[String]]): Option[String] = {
-    headers.get("content-type") match {
-      case Some(stringList) => Some(stringList.head)
-      case None => None
-    }
-  }
-
-  def getContentLength(headers: Map[String, Seq[String]]): Option[Long] = {
-    headers.get("content-length") match {
-      case Some(stringList) => Some(stringList.head.toLong) // supposed to be a valid long
-      case None => None
-    }
-  }
-
-  def filterContentTypeAndLengthFromHeaders[T](headers: Map[String, T]): Map[String, T] = {
-    val forbiddenKeys = Seq("content-type", "content-length")
-    headers.filterNot(e => forbiddenKeys.contains(e._1))
-  }
-
-  def defaultFlatteningFunc(stringList: Seq[String]): String = {
-    stringList.mkString(",")
-  }
-
-  def flattenHeaders(headers: Map[String, Seq[String]], flatteningFunc: Seq[String] => String = defaultFlatteningFunc): Map[String, String] = {
-    headers.map {
-      case (key, stringList) => (key, flatteningFunc(stringList))
     }
   }
 
