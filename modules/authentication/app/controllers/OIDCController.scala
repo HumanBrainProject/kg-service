@@ -40,6 +40,7 @@ class OIDCController @Inject()(cc: ControllerComponents,
   val logger = Logger(this.getClass)
 
   def groups(): Action[AnyContent] = authenticatedUserAction.async { implicit request: UserRequest[AnyContent] =>
+    logger.debug(s"Authenticated user ${request.user}")
     authService.groups(request.user).map( l => Ok(Json.toJson(l)))
   }
 
