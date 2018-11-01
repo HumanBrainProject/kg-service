@@ -120,7 +120,7 @@ class NexusEditorController @Inject()(
     editorService.retrieveInstance(nexusPath, id, token, List(("fields", "all"),("deprecated", "false"),("rev", revision.toString))).map {
       case Right(instance) =>
         val json = instance.content
-        val nexusId = NexusInstance.getIdForEditor((json \ "http://hbp.eu/reconciled#original_parent" \ "@id").as[String], config.reconciledPrefix)
+        val nexusId = NexusInstance.getIdForEditor((json \ "https://schema.hbp.eu/inference/extends" \ "@id").as[String], config.reconciledPrefix)
         val datatype = nexusId.splitAt(nexusId.lastIndexOf("/"))
         val originalDatatype = NexusPath(datatype._1.split("/").toList)
         FormService.getFormStructure(originalDatatype, json, config.reconciledPrefix, formService.formRegistry) match {

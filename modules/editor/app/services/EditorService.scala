@@ -144,12 +144,12 @@ class EditorService @Inject()(wSClient: WSClient,
          |    "value": [
          |      {
          |        "op":"eq",
-         |        "path":"http://hbp.eu/reconciled#original_parent",
+         |        "path":"https://schema.hbp.eu/inference/extends",
          |        "value": "${config.nexusEndpoint}/v0/data/${originalPath.toString()}/$id"
          |      },
          |      {
          |        "op":"eq",
-         |        "path":"http://hbp.eu/reconciled#original_parent",
+         |        "path":"https://schema.hbp.eu/inference/extends",
          |        "value": "${config.nexusEndpoint}/v0/data/${editorOrg}/${originalPath.domain}/${originalPath.schema}/${originalPath.version}/$id"
          |      }
          |    ]

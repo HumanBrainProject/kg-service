@@ -92,7 +92,7 @@ object EditorUserService {
     s"""
        |{
        |  "@context": {
-       |    "@vocab": "http://schema.hbp.eu/graph_query/",
+       |    "@vocab": "https://schema.hbp.eu/graphQuery/",
        |    "schema": "http://schema.org/",
        |    "kgeditor": "http://hbp.eu/kgeditor/",
        |    "nexus": "https://nexus-dev.humanbrainproject.org/vocabs/nexus/core/terms/v0.1.0/",
