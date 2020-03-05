@@ -12,9 +12,6 @@
 # Nexus services
 -> /nexus nexus.Routes
 
-# Proxy services
--> /proxy proxy.Routes
-
 # Webhook service
 -> /webhook webhook.Routes
 

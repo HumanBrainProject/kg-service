@@ -34,10 +34,6 @@ This is used for example by the proxy module in order to query the indices autho
 
 All the helpers and API wrapper for the Nexus API can be found in this project.
 
-### Proxy
-
-This service handles the call to our search ui project.
-
 ### Data_import
 
 Anything related to data import is found in this modules.
