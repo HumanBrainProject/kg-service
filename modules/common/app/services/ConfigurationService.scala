@@ -28,20 +28,12 @@ class ConfigurationService @Inject()(configuration: Configuration) {
   val oidcUserInfoEndpoint = s"$oidcEndpoint/userinfo"
   val oidcTokenEndpoint = s"$oidcEndpoint/token"
   val cacheExpiration: FiniteDuration = configuration.get[FiniteDuration]("proxy.cache.expiration")
-  val blazegraphNameSpace: String = configuration.getOptional[String]("blazegraph.namespace").getOrElse("kg")
-
   val nexusEndpoint: String =
     configuration.getOptional[String]("nexus.endpoint").getOrElse("https://nexus-dev.humanbrainproject.org")
   val reconciledPrefix: String = configuration.getOptional[String]("nexus.reconciled.prefix").getOrElse("reconciled")
   val editorPrefix: String = configuration.getOptional[String]("nexus.editor.prefix").getOrElse("editor")
-
-  val sparqlEndpoint: String =
-    configuration.getOptional[String]("blazegraph.endpoint").getOrElse("http://localhost:9999")
   val kgQueryEndpoint: String = configuration.getOptional[String]("kgquery.endpoint").getOrElse("http://localhost:8600")
   val iamEndpoint = configuration.get[String]("nexus.iam")
   val authEndpoint = configuration.get[String]("auth.endpoint")
   val idmApiEndpoint = s"$authEndpoint/idm/v1/api"
-  val editorSubSpace = configuration.getOptional[String]("editor.subspace").getOrElse("editor")
-  val hbpUrl = configuration.getOptional[String]("hbp.url").getOrElse("https://kg.humanbrainproject.eu/webapp")
-
 }

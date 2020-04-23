@@ -36,7 +36,7 @@ All the helpers and API wrapper for the Nexus API can be found in this project.
 
 ### Proxy
 
-This service handles the call to our search ui project.
+This service handles the call to the export service.
 
 ### Data_import
 
