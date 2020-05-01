@@ -42,7 +42,8 @@ class ExportContainerController @Inject()(cc: ControllerComponents)(
   config: Configuration,
   mat: Materializer
 ) extends AbstractController(cc) {
-  private val log = Logger(this.getClass)
+  val log = Logger(this.getClass)
+
 
   def exportContainer(source: String, filter: Option[String]): Action[AnyContent] = Action.async { implicit request =>
     // capture unhandled params to forward them to swift API call
@@ -177,7 +178,7 @@ object ExportContainerController {
     config: Configuration,
     mat: Materializer
   ): Future[Option[Seq[JsObject]]] = {
-    Logger.info(s"starting export of following container: ${sourceContainer}")
+    log.info(s"starting export of following container: ${sourceContainer}")
     // get json view of container
     ws.url(sourceContainer).addHttpHeaders(ACCEPT -> JSON).get().map { queryResponse =>
       // Get container's content to zip
@@ -196,7 +197,7 @@ object ExportContainerController {
     sourceContainer: String,
     sink: Sink[ByteString, Future[Done]]
   )(implicit ws: WSClient, ec: ExecutionContext, mat: Materializer): Future[Done] = {
-    Logger.debug(s"entry added for ${getFileName(fileInfo)}")
+    log.debug(s"entry added for ${getFileName(fileInfo)}")
     ws.url(s"${sourceContainer}/${getFileUrl(fileInfo)}")
       .withMethod("GET")
       .stream()

@@ -19,16 +19,14 @@ lazy val nexus = (project in file("modules/nexus"))
   .enablePlugins(PlayScala)
   .dependsOn(common, auth)
 
-lazy val proxy = (project in file("modules/proxy"))
-  .enablePlugins(PlayScala)
-  .dependsOn(common, auth)
-
 lazy val kg_service = (project in file("."))
   .enablePlugins(PlayScala)
-  .aggregate(common, auth, data_import, nexus, proxy)
-  .dependsOn(common, auth, data_import, nexus, proxy)
+  .aggregate(common, auth, data_import, nexus)
+  .dependsOn(common, auth, data_import, nexus)
 
 Common.settings
+
+javaOptions in Universal ++= Seq("-Dpidfile.path=/dev/null")
 
 sources in (Compile, doc) := Seq.empty
 
