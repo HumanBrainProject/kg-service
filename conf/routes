@@ -3,9 +3,6 @@
 # https://www.playframework.com/documentation/latest/ScalaRouting
 # ~~~~
 
-# Auth services
--> /auth auth.Routes
-
 # Data import services
 -> /dataimport data_import.Routes
 
