@@ -3,7 +3,7 @@ package services
 import helpers.ConfigMock
 import helpers.ConfigMock._
 import mockws.{MockWS, MockWSHelpers}
-import org.scalatest.mockito.MockitoSugar
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.libs.json.Json
