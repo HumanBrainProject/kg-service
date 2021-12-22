@@ -1,3 +1,5 @@
+This repository is deprecated and will be no longer in use!
+
 # KG Service
 
 This service is a Play framework application which requires the latest SBT installation.
